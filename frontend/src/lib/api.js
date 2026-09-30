@@ -1,6 +1,7 @@
-// Backend base URL. Empty = auto-detect (localhost in dev, same origin when hosted).
+// Empty backendUrl = auto-detect: localhost:8000 in dev, same origin once hosted.
 export const CONFIG = { backendUrl: '' };
 
+// A hosted page is already on the backend's origin, so only dev needs the fixed port.
 function resolveApiBase() {
   if (CONFIG.backendUrl) return CONFIG.backendUrl.replace(/\/+$/, '');
   const { protocol, hostname, origin } = window.location;

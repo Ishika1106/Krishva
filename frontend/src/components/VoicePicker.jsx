@@ -1,6 +1,4 @@
-// One voice engine: the Krishva server. A Test button confirms sound works
-// before a photo is uploaded, which is the quickest way to tell whether
-// audio is the problem or something else.
+// One engine only, so Test voice is the quickest way to check audio before uploading a photo.
 export default function VoicePicker({ onTest, t, testing }) {
   return (
     <div className="voice-picker">

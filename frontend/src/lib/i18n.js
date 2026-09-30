@@ -1,5 +1,4 @@
-// Fallback copy so the UI renders before the API responds, and if it is down.
-// The backend is the source of truth; translator() prefers whatever it sends.
+// Fallback copy so the UI renders before the API answers, and if it is down; translator() prefers the backend's copy.
 export const FALLBACK_UI = {
   en: {
     tagline: 'Krish (farming) + Nova (new) = New Farming',

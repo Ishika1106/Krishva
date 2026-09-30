@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { speakUrl } from './api.js';
 
-// One engine only: the server generates a real audio file, which always
-// plays. The browser's speechSynthesis was tried first and had to be
-// dropped, because Chrome runs it to completion, fires onstart and onend,
-// raises no error, and still produces no sound.
+// The server returns a real audio file, so it always plays; speechSynthesis was dropped because Chrome runs it silently.
 export function useSpeech() {
   const [speaking, setSpeaking] = useState(false);
   const [note, setNote] = useState('');

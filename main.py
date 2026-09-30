@@ -40,11 +40,7 @@ app = FastAPI(
     version="1.2.0",
 )
 
-# CORS is needed because the frontend runs on a different port than this API.
-# 5500 is the old static server; 5173 is the Vite dev server; the LAN address
-# is for testing a phone on the same Wi-Fi. Origins are listed explicitly
-# because the CORS spec forbids a wildcard with allow_credentials=True.
-# Add your deployed frontend's origin here when you host it.
+# CORS needs explicit origins: the spec forbids a wildcard with credentials. Add your deployed frontend here.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -61,29 +57,20 @@ app.add_middleware(
 )
 
 
-# --------------------------------------------------------------------------
-# Load artefacts ONCE at startup.
-# Doing this at module level (not inside the request handler) means the
-# 2.4M parameters are deserialised once and every request reuses a warm model.
-# --------------------------------------------------------------------------
+# Artefacts load once at module level so all requests share a warm model.
 model = tf.keras.models.load_model("crop_disease_model.h5")
 
 with open("class_names.json", "r", encoding="utf-8") as f:
     class_indices = json.load(f)
 
-# class_names.json maps name -> index. The model predicts indices, so flip it
-# to index -> name. int() is needed because JSON values arrive as strings.
+# class_names.json maps name -> index, but the model predicts indices, so flip it. int() is needed because JSON values arrive as strings.
 index_to_class = {int(v): k for k, v in class_indices.items()}
 
-# disease_info.json is the single source of truth for every piece of user-facing
-# text in both languages, so English and Hindi can never drift apart. It also
-# holds the UI strings the frontend needs to render its own labels.
+# Single source of truth for all user-facing text, so English and Hindi cannot drift apart.
 with open("disease_info.json", "r", encoding="utf-8") as f:
     disease_info = json.load(f)
 
-# The training run accidentally picked up dataset/duplicates/ as a 16th class.
-# It holds no images, so this dead output unit is hidden from the API. After
-# retraining on a clean dataset this set stays empty.
+# The training run picked up dataset/duplicates/ as a 16th class; it has no images, so hide it.
 JUNK_CLASSES = {"duplicates"}
 VALID_INDICES = [i for i in sorted(index_to_class) if index_to_class[i] not in JUNK_CLASSES]
 
@@ -167,10 +154,8 @@ def root():
 @app.post("/api/predict")
 async def predict_api(file: UploadFile = File(...)):
     """
-    Classify an uploaded leaf image.
-
-    Both languages are returned for every result, so the frontend can switch
-    language instantly without uploading the image again.
+    Classify an uploaded leaf image. Both languages come back in one response,
+    so the frontend can switch language without uploading the image again.
     """
     filename = (file.filename or "").lower()
     if not any(filename.endswith(s) for s in ALLOWED_SUFFIXES):
@@ -184,8 +169,7 @@ async def predict_api(file: UploadFile = File(...)):
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Image is larger than the 10 MB limit.")
 
-    # BytesIO wraps the uploaded bytes in an in-memory file object so PIL can
-    # read them without ever writing to disk.
+    # BytesIO lets PIL read the upload in memory, so nothing is written to disk.
     try:
         img = image.load_img(io.BytesIO(contents), target_size=IMAGE_SIZE)
     except Exception:
@@ -194,8 +178,7 @@ async def predict_api(file: UploadFile = File(...)):
             detail="Could not read that image. It may be corrupted or not a real image.",
         )
 
-    # /255.0 MUST match rescale=1./255 in train_model.py, and the batch
-    # dimension must be added with expand_dims. Both are silent-failure points.
+    # /255.0 must match rescale=1./255 in train_model.py, or accuracy silently drops.
     img_array = image.img_to_array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
@@ -208,9 +191,7 @@ async def predict_api(file: UploadFile = File(...)):
     results = []
     for idx in top_indices:
         class_name = index_to_class[idx]
-        # float() is required: predictions[idx] is a numpy.float32 and
-        # json.dumps cannot serialise numpy scalars, which raised
-        # "TypeError: Object of type float32 is not JSON serializable".
+        # float() is required: json.dumps cannot serialise a numpy.float32.
         confidence = round(float(100 * predictions[idx]), 2)
         info = disease_info.get(class_name, {})
         results.append(
@@ -245,11 +226,8 @@ def _tts_gTTS(text, lang):
 
 def _tts_say(text, lang):
     """
-    Offline fallback using the macOS 'say' command, which plays the voices
-    already installed on the machine (Lekha for Hindi). Keeps voice working
-    when gTTS cannot reach the internet. Output is converted to WAV because
-    every browser plays WAV, while Android's media stack is unreliable
-    with AIFF.
+    Offline fallback: macOS 'say' plays voices already on the machine, so voice
+    survives an internet outage. Converted to WAV, which every browser plays.
     """
     import subprocess
     import tempfile
@@ -272,8 +250,7 @@ def _tts_say(text, lang):
         if done.returncode != 0 or not os.path.getsize(path):
             raise RuntimeError(done.stderr.strip() or "say failed")
 
-        # Convert to WAV: every browser on every OS plays WAV, whereas
-        # Android's media stack is unreliable with AIFF.
+        # Convert to WAV: Android's media stack is unreliable with AIFF.
         wav = path + ".wav"
         conv = subprocess.run(
             ["afconvert", "-f", "WAVE", "-d", "LEI16@22030", path, wav],
@@ -331,8 +308,7 @@ async def speak_api(payload: dict = None):
             detail="Text-to-speech failed. " + " | ".join(problems),
         )
 
-    # Return the audio bytes inline rather than base64 in JSON: no 33% size
-    # penalty and the browser can start playing sooner.
+    # Inline bytes instead of base64: no 33% size penalty and playback starts sooner.
     return Response(
         content=audio,
         media_type=media_type,
