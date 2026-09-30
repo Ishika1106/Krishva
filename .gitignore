@@ -37,6 +37,9 @@ remedy_hi.mp3
 *.png
 !docs/*.png
 
+# Internal working notes, kept local rather than published
+PROJECT_ANALYSIS.txt
+
 # macOS junk files
 .DS_Store
 .AppleDouble

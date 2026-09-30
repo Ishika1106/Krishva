@@ -1,36 +1,87 @@
-# Krishva 🌾 — New Farming
+<div align="center">
 
-**Krish** (कृषि) = farming · **Nova** (नव) = new → **Krishva = New Farming**
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:FF9933,50:F7F7F2,100:138808&height=190&section=header&text=Krishva&fontSize=72&fontColor=1A1A1A&animation=fadeIn&fontAlignY=36&desc=Krish%20%2B%20Nova%20%3D%20New%20Farming&descAlignY=56&descSize=19&descColor=333333" width="100%" alt="Krishva banner"/>
 
-A deep learning system that identifies crop diseases from a photo of a single
-leaf, tells the farmer how confident it is, and gives the remedy in **English
-and Hindi** — plus spoken output, so a farmer who cannot read either language
-can still use it.
+<img src="https://readme-typing-svg.demolab.com/?font=Georgia&size=18&duration=3400&pause=1600&color=6B6B6B&center=true&vCenter=true&width=720&lines=%E0%A4%AA%E0%A4%A4%E0%A5%8D%E0%A4%B0%E0%A5%87%E0%A4%9A%E0%A4%BE+%E0%A4%AA%E0%A4%A4%E0%A5%8D%E0%A4%A0%2C+%E0%A4%AC%E0%A4%9A%E0%A4%A8%E0%A5%87%E0%A4%82+%E0%A4%AA%E0%A4%9D%E0%A4%9A%E0%A4%BE%E0%A4%A8%E0%A5%87%E0%A4%82;Diseases+from+a+leaf+photo%2C+in+your+own+language;%E0%A4%B5%E0%A4%BF%E0%A4%9A%E0%A5%8D%E0%A4%AA%E0%A4%93+%E0%A4%86%E0%A4%AE%E0%A4%B3%E0%A4%BE+%E0%A4%95%E0%A4%B0%E0%A4%A4%E0%A4%BE+%E0%A4%B8%E0%A4%95%E0%A5%87%E0%A4%82+-%E0%A4%9A%E0%A5%80%E0%A4%B0%E0%A4%BE%E0%A4%AA%E0%A4%9F%E0%A4%82+%E0%A4%B0%E0%A4%B9%E0%A4%A4%E0%A5%87+%E0%A4%AF%E0%A4%BE%E0%A4%AF;Built+with+MobileNetV2.+Made+for+India." alt="Typing SVG"/>
 
-Built for Indian farmers, which is why Hindi remedies and text-to-speech are
-first-class features rather than extras.
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.10+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.20-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)](https://tensorflow.org)
+[![Keras](https://img.shields.io/badge/Keras-3-D00000?style=flat-square&logo=keras&logoColor=white)](https://keras.io)
+[![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3?style=flat-square&logo=bootstrap&logoColor=white)](https://getbootstrap.com)
+[![Made for India](https://img.shields.io/badge/Made%20for%20India-FF9933?style=flat-square)](#why-krishva)
+
+**Krishva takes a photo of one leaf, names the disease, tells the farmer how sure it is, and reads the remedy out loud in Hindi or English.**
+
+The name is the idea: **Krish** (कृषि) is farming, **Nova** (नव) is new, and together they make **New Farming**.
+
+**[How it works](#how-it-works)** · **[Features](#features)** · **[Tech stack](#tech-stack)** · **[How to run it](#how-to-run-it)** · **[Training from scratch](#training-from-scratch)**
+
+</div>
 
 ---
 
-## What it does
+## Why Krishva
 
+A farmer who spots brown patches on a tomato leaf has three questions, in this order: *what is this, how sure are you, and what do I spray today?* Most apps answer only the first, and answer it in English.
+
+Krishva answers all three. It shows its top three guesses with confidence percentages instead of one confident-sounding answer, gives the remedy for the most likely disease, and speaks it aloud. Switch to Hindi and the whole interface, the disease name, the remedy, and the audio all switch with it, because a farmer who cannot read the remedy in the language the app is showing is not much better off than one who cannot read it at all.
+
+The audience shaped the design more than the model did. English and Hindi are both first-class, voice output is a core feature rather than an add-on, and a low confidence warning tells the farmer to retake the photo instead of presenting a guess as fact.
+
+---
+
+## How it works
+
+```mermaid
+flowchart TD
+    A["Farmer uploads a photo of one leaf"] --> B["React app on Vite, port 5173"]
+    B --> C["FastAPI receives the image"]
+    C --> D["Pillow decodes it to 224x224, scaled by 1/255"]
+    D --> E["MobileNetV2, backbone frozen on ImageNet weights"]
+    E --> F["Softmax over 15 crop disease classes"]
+    F --> G["Top 3 ranked with confidence percentages"]
+    G --> H["Remedy for the rank 1 disease, in English and Hindi"]
+    H --> I{"Voice output on?"}
+    I -- "On" --> J["Server generates MP3 with gTTS"]
+    J --> K["Browser plays it"]
+    I -- "Off" --> L["Results only"]
+    K --> M["Switch language: labels, names, remedy and audio all re-render"]
+    L --> M
 ```
-Leaf photo
-   │
-   ├─ Web UI (index.html)  ──POST──▶  FastAPI (main.py)  ──▶  MobileNetV2 CNN
-   │                                                     top-3 diseases,
-   │                                                     confidence %, remedy
-   └─ Terminal (predict.py) ───────────────────────────▶  + Hindi/English speech
-                                                          + confidence chart
-```
 
-15 disease classes across three crops:
+The whole round trip happens in one response. Both languages come back together, so switching between English and Hindi re-renders the screen and re-speaks the answer instantly without uploading the photo a second time.
 
-| Crop | Classes |
-|---|---|
-| Tomato | bacterial spot, early blight, late blight, leaf mold, septoria leaf spot, spider mites (two-spotted), target spot, mosaic virus, yellow leaf curl virus, healthy |
-| Pepper bell | bacterial spot, healthy |
-| Potato | early blight, late blight, healthy |
+---
+
+## Features
+
+**Prediction**
+- 15 disease classes across tomato, pepper bell and potato, each with a healthy counterpart
+- Top 3 results with confidence percentages, ranked, not just a single label
+- A confidence bar chart in the terminal version
+- A low confidence warning suggesting a clearer photo when the model is unsure
+
+**Bilingual by default**
+- Every disease name and remedy exists in both English and Hindi
+- The language toggle switches the entire interface, including labels, warnings and buttons
+- One JSON file feeds the API, the CLI and the web app, so the two languages cannot drift apart
+
+**Voice**
+- Spoken results in both languages, generated by the server as real audio files
+- Works for low-literacy users, and needs no browser speech support
+- A Test voice button, so audio can be checked before a photo is even picked
+
+**Interfaces**
+- React web app, responsive, with an image preview
+- A command line version that predicts, speaks, and opens the confidence chart
+- Interactive API docs at `/docs` with an upload box
+
+**Robustness**
+- Uploads are checked for type and size before any processing
+- 10 MB upload limit and a 1200 character cap on text-to-speech
+- The model and data load once at startup, so requests are served from a warm model
 
 ---
 
@@ -38,13 +89,13 @@ Leaf photo
 
 | Layer | Technology | Why |
 |---|---|---|
-| Model | **MobileNetV2** (Keras, TensorFlow 2.20) | 2.4M params, 0.6 s CPU inference, small enough for a phone |
+| Model | **MobileNetV2** (Keras 3, TensorFlow 2.20) | 2.4M parameters and about 0.6s CPU inference, small enough to run on a phone |
 | Method | **Transfer learning**, backbone frozen | 20K images is far too few to train a CNN from scratch |
-| Data | Keras `ImageDataGenerator` + augmentation | labels come free from folder names |
-| Imbalance | `compute_class_weight('balanced')` | classes range from 236 to 2,567 images (~11×) |
-| Serving | **FastAPI** + Uvicorn | async, type-validated, free interactive docs at `/docs` |
-| Frontend | Vanilla HTML + Bootstrap + `fetch` | zero build step, zero npm dependencies |
-| Voice | **gTTS** (Hindi, needs internet) + **pyttsx3** (English, offline) | accessibility for low-literacy users |
+| Data | Keras `ImageDataGenerator` with augmentation | the label comes free from the folder name |
+| Imbalance | `compute_class_weight('balanced')` | classes range from 236 to 2,567 images, about 11× |
+| Serving | **FastAPI** + Uvicorn | async, validated, and interactive docs at `/docs` |
+| Frontend | **React 18** + **Vite 8** + Bootstrap 5 | component structure, hot reload, no CDN dependency |
+| Voice | **gTTS** for MP3, macOS `say` as the offline fallback | server generated audio plays everywhere a browser plays audio |
 
 ### Model architecture
 
@@ -57,17 +108,18 @@ Input (None, 224, 224, 3)
   → Dense(15, activation='softmax')                            → (None, 15)
 
 Total params     2,423,887
-Trainable params   165,903   (6.8% — the rest stays frozen)
+Trainable params   165,903   (6.8%, the rest stays frozen)
 ```
 
-`GlobalAveragePooling2D` instead of `Flatten` cuts the first Dense layer from
-~8M parameters to 164K, which matters a lot on a 16K-image dataset.
+`GlobalAveragePooling2D` instead of `Flatten` takes the first Dense layer from roughly 8M parameters down to 164K, which is what makes a model this size workable on a 20K image dataset.
 
 ---
 
-## Quick start
+## How to run it
 
-### 1. Setup
+The trained model is committed, so there is nothing to train first.
+
+**1. Backend**
 
 ```bash
 git clone https://github.com/Ishika1106/Krishva.git
@@ -75,12 +127,41 @@ cd Krishva
 python3 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
+uvicorn main:app --reload --port 8000
 ```
 
-### 2. Get the dataset
+**2. Frontend**
 
-The `dataset/` folder is **not** in this repo — it is 370 MB of images.
-Download the PlantVillage dataset and place it so the structure is:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**3. Open it**
+
+Go to **http://localhost:5173** and upload a leaf. The API is at **http://127.0.0.1:8000**, and **http://127.0.0.1:8000/docs** gives you a Swagger UI with an upload box you can test against directly.
+
+Turn Voice output on and press **Test voice** before uploading anything. If you hear the sample, audio is working.
+
+**Command line**
+
+```bash
+python predict.py                  # Hindi voice
+python predict.py leaf.jpg         # your own image
+python predict.py leaf.jpg --lang en
+```
+
+It prints the top three, the remedy in both languages, and opens the confidence chart.
+
+---
+
+## Training from scratch
+
+Only needed if you want to retrain. The `dataset/` folder is not in the repo, it is 370 MB of images.
+
+**The folder name is the label.** `flow_from_directory` reads it directly, so the structure has to be:
 
 ```
 dataset/
@@ -91,48 +172,15 @@ dataset/
 └── Tomato_tomato_yellowleaf_curl_virus/   *.JPG
 ```
 
-**The folder name is the label.** `flow_from_directory` reads it directly.
 20,764 images across 15 classes.
-
-### 3. Choose a path
-
-**A — use the pre-trained model (no training needed)**
-
-The trained model is committed as `crop_disease_model.h5` (11 MB), so the
-demo runs immediately.
-
-```bash
-# Terminal 1 — backend
-uvicorn main:app --reload --port 8000
-
-# Terminal 2 — frontend
-python -m http.server 5500
-```
-
-Open **http://localhost:5500/index.html** and upload a leaf.
-
-> You must use `http://localhost:5500`, not open the file directly.
-> Browsers block `fetch()` from `file://` origins.
-
-Check the API is alive at **http://127.0.0.1:8000/docs** — you get a free
-Swagger UI with an upload box.
-
-**B — train it yourself**
 
 ```bash
 python check_corrupted.py     # verify no broken images
-python move_duplicates.py     # move exact duplicates out of dataset/
-rm -rf dataset_duplicates     # optional, keep the repo tidy
-python train_model.py         # ~1-3 h on a laptop CPU
+python move_duplicates.py     # move byte-identical duplicates out
+python train_model.py         # ~1-3 hours on a laptop CPU
 ```
 
-**C — command line, with voice**
-
-```bash
-python predict.py                      # Hindi voice (needs internet)
-python predict.py leaf.jpg             # your own image
-python predict.py leaf.jpg --lang en   # English voice, offline
-```
+`train_model.py` writes `class_names.json` from `train_gen.class_indices`, so the index-to-name mapping is generated by the same code that built the labels and the two cannot disagree.
 
 ---
 
@@ -140,88 +188,73 @@ python predict.py leaf.jpg --lang en   # English voice, offline
 
 ```
 Krishva/
-├── index.html              Web UI: upload, preview, results
-├── main.py                 FastAPI backend, /api/predict
-├── train_model.py          Training: MobileNetV2 + transfer learning
-├── predict.py              CLI predictor with TTS + chart
+├── main.py                 FastAPI backend: /api/predict and /api/speak
+├── predict.py              CLI: predict, speak, open the chart
+├── train_model.py          MobileNetV2 with a frozen backbone
+├── frontend/
+│   ├── src/App.jsx         Main app: upload, results, language and voice
+│   ├── src/components/     ResultTable, SegmentedToggle, VoicePicker
+│   ├── src/lib/            api.js, i18n.js, useSpeech.js
+│   └── src/styles.css
+├── disease_info.json       All 15 classes: English + Hindi name and remedy
 ├── crop_disease_model.h5   Trained model (11 MB, committed)
-├── class_names.json        class name ↔ index mapping
-├── remedies.json           Disease → remedy in English and Hindi
-├── requirements.txt        Pinned dependencies
+├── class_names.json        Class name ↔ index mapping
+├── requirements.txt        Pinned Python dependencies
 ├── check_corrupted.py      Dataset integrity scanner
 ├── move_duplicates.py      MD5 exact-duplicate remover
-├── voices.py               Lists TTS voices available on this machine
+├── voices.py               Lists the TTS voices installed on this machine
 ├── test.JPG                Sample leaf image
-└── PROJECT_ANALYSIS.txt    Full technical audit + interview guide
+└── LICENSE
 ```
 
 ---
 
-## Design decisions worth knowing
+## Design decisions
 
-**Transfer learning.** MobileNetV2 is pretrained on ImageNet (1.28M images).
-`base_model.trainable = False` freezes its 2,257,984 weights so the optimizer
-only learns our 166K head. Training from scratch on 20K images would badly
-overfit.
+**Transfer learning.** MobileNetV2 comes pretrained on 1.28M ImageNet images. Setting `base_model.trainable = False` freezes its 2,257,984 weights so the optimizer only learns our 166K head. Training from scratch on 20K images would overfit badly.
 
-**Class imbalance.** `Potato_healthy` has 236 images, `Tomato_yellow_leaf_curl_virus`
-has 2,567. Balanced class weights push the rare classes ~11× harder
-(4.69 vs 0.43), so the model cannot just learn the majority classes.
+**Class imbalance.** `Potato_healthy` has 236 images, `Tomato_yellow_leaf_curl_virus` has 2,567. Balanced class weights push the rare classes about 11× harder than the common ones, so the model cannot simply learn to predict the majority classes.
 
-**Two data generators.** Augmentation is applied to *training only*. A single
-shared `ImageDataGenerator` would rotate and flip your **validation** images
-too, which corrupts `val_loss` and breaks `EarlyStopping`. We verified this
-empirically before splitting them.
+**Two data generators.** Augmentation is applied to training only. A single shared `ImageDataGenerator` would rotate and flip the validation images too, which makes `val_loss` meaningless and breaks `EarlyStopping`. This was verified before the split.
 
-**Preprocessing must match exactly.** `rescale=1./255` and `target_size=(224,224)`
-appear identically in `train_model.py`, `main.py` and `predict.py`. Any mismatch
-does not raise an error — it silently destroys accuracy.
+**Preprocessing has to match exactly.** `rescale=1./255` and `target_size=(224,224)` appear identically in `train_model.py`, `main.py` and `predict.py`. A mismatch does not raise an error, it just quietly destroys accuracy.
 
-**Label mapping is not hardcoded.** `train_model.py` writes
-`train_gen.class_indices` to `class_names.json`, and the serving code flips it
-with `{int(v): k for k, v in class_indices.items()}`. Keras assigns indices
-alphabetically, so this is generated by the same code that built the labels and
-the two cannot disagree.
+**All disease text in one file.** `disease_info.json` holds the English and Hindi name and remedy for every class, plus the interface strings, and `main.py` and `predict.py` both read from it. The original project kept two separate inline Python dictionaries and had already lost a class from both.
 
-**Remedies live in one file.** `remedies.json` holds `{disease: {en, hi}}` and
-is shared by `main.py` and `predict.py`, so they cannot drift out of sync.
+**Voice comes from the server.** The browser's own `speechSynthesis` was tried first and dropped. On Chrome it reports 180 available voices, fires `onstart` and `onend`, and raises no error while producing no sound at all, so there is nothing to catch and nowhere to fall back from. The server generates a real audio file instead, which plays everywhere. A macOS `say` fallback keeps voice working if the internet drops.
 
----
-
-## Limitations
-
-Honest list, because knowing these is part of the project:
-
-- **Overall accuracy is the wrong metric** for an 11× imbalanced dataset.
-  Macro F1 and a per-class report would be correct. Not yet built.
-- **No test set.** There is a train/validation split but no held-out test set.
-- **No out-of-distribution rejection.** Given a photo of a car the model will
-  still confidently return one of 15 diseases. A confidence threshold is the
-  simple mitigation (the UI warns below 60%).
-- **Near-duplicate leakage.** `move_duplicates.py` only finds *byte-identical*
-  files. ~411 images have `.1`/`.2` filename suffixes that look like re-shoots
-  of the same leaf; those can land in train while their twin lands in
-  validation. Fixing this needs perceptual hashing or grouped splitting.
-- **The committed model was trained before these fixes**, so it still has a
-  16th dead output unit from an old `dataset/duplicates/` folder. The serving
-  code filters it out, so results are correct. Retraining produces a clean
-  15-class model.
-- **macOS only for voice.** `afplay` and `pyttsx3` need the OS speech engine.
+**Remedies are practical, not generic.** Each one names what to remove, what to spray, and what to change about watering, in language a farmer would actually use.
 
 ---
 
 ## Possible next steps
 
-1. Confusion matrix + per-class precision/recall/F1 report
-2. Fine-tune the last MobileNetV2 block at 100× lower learning rate
+1. Confusion matrix with a per-class precision, recall and F1 report
+2. Fine tune the last MobileNetV2 block at a much lower learning rate
 3. Convert to TFLite for offline on-device inference
-4. Group split by leaf to eliminate near-duplicate leakage
-5. Confidence threshold with a "retake the photo" path
+4. Group the train and validation split by leaf to remove near-duplicate leakage
+5. Convert the model to ONNX and run it in the browser with a Python microservice for training only
+
+---
+
+## Credits
+
+Dataset: [PlantVillage](https://plantvillage.psu.edu/), by Hughes and Salathé. Please cite the original authors if you build on it.
+
+Backbone: MobileNetV2, Howard et al.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
-Dataset: PlantVillage (public). Please cite the original authors if you use it.
+---
+
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:138808,50:F7F7F2,100:FF9933&height=110&section=footer" width="100%" alt="footer"/>
+
+*Krishva — for the ones still growing.*
+
+</div>
