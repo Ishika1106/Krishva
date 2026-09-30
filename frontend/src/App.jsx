@@ -19,11 +19,21 @@ export default function App() {
   const inputRef = useRef(null);
 
   const t = useMemo(() => translator(apiUi, lang), [apiUi, lang]);
-  const { speak, stop, speaking, note, setNote, supported, voices, preferred, setPreferred } =
-    useSpeech();
+  const {
+    speak, stop, speaking, note, setNote, supported,
+    voices, preferred, setPreferred, engine, setEngine,
+  } = useSpeech();
+  const [testing, setTesting] = useState(false);
 
   // Only offer voices that match the language on screen, so the list stays short.
   const localVoices = useMemo(() => voicesFor(lang, voices), [lang, voices]);
+
+  // Lets the user confirm audio works before uploading anything.
+  const testVoice = async () => {
+    setTesting(true);
+    await speak(t('voice_sample'), lang, t);
+    setTesting(false);
+  };
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -120,17 +130,8 @@ export default function App() {
     if (inputRef.current) inputRef.current.focus();
   };
 
-  // Explain the audio path only when one is actually needed.
-  const voiceHint =
-    voice !== 'on'
-      ? ''
-      : localVoices.length > 0
-        ? ''
-        : supported
-          ? apiUp === false
-            ? t('no_voice_and_no_server')
-            : t('server_voice_note')
-          : t('server_voice_note');
+  // Only warn when the chosen path genuinely cannot work.
+  const voiceHint = note || (voice !== 'on' ? '' : apiUp === false ? t('api_down') : '');
 
   return (
     <div className="container py-4" style={{ maxWidth: 700 }}>
@@ -176,9 +177,11 @@ export default function App() {
                 voices={localVoices}
                 value={preferred}
                 onChange={setPreferred}
+                engine={engine}
+                onEngineChange={setEngine}
+                onTest={testVoice}
+                testing={testing}
                 t={t}
-                lang={lang}
-                autoLabel={t('voice_auto')}
               />
             </div>
           </div>

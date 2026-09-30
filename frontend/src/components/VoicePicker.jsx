@@ -1,28 +1,56 @@
-// Dropdown listing the voices the current device already has.
-// Empty list means the OS has no voice for that language, and the parent
-// falls back to the server, which is why the hint text explains that.
-export default function VoicePicker({ voices, value, onChange, t, autoLabel, lang }) {
+// Choose between device voices and server audio, and test the choice.
+//
+// Chrome's speechSynthesis often reports success (onstart/onend fire) while
+// producing no sound at all, so it cannot be trusted as the only path. The
+// server generates a real audio file that always plays, so it is the default
+// and the device voices are opt-in.
+export default function VoicePicker({
+  voices, value, onChange, engine, onEngineChange, onTest, t, testing,
+}) {
   return (
     <div className="voice-picker">
-      <label className="small fw-semibold text-secondary" htmlFor="voiceSelect">
+      <label className="small fw-semibold text-secondary" htmlFor="engineSelect">
         {t('voice_choice')}
       </label>
-      <select
-        id="voiceSelect"
-        className="form-select form-select-sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">{autoLabel}</option>
-        {voices.map((v) => (
-          <option key={v.voiceURI} value={v.voiceURI}>
-            {v.name || v.lang} ({v.lang})
+      <div className="d-flex gap-2">
+        <select
+          id="engineSelect"
+          className="form-select form-select-sm"
+          value={engine}
+          onChange={(e) => onEngineChange(e.target.value)}
+        >
+          <option value="server">{t('engine_server')}</option>
+          <option value="device" disabled={voices.length === 0}>
+            {t('engine_device')}
           </option>
-        ))}
-      </select>
-      {voices.length === 0 && (
-        <div className="small text-muted mt-1">{t('no_local_voice')}</div>
+        </select>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-success text-nowrap"
+          onClick={onTest}
+          disabled={testing}
+        >
+          {testing ? t('voice_testing') : t('voice_test')}
+        </button>
+      </div>
+
+      {engine === 'device' && voices.length > 0 && (
+        <select
+          className="form-select form-select-sm mt-2"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={t('voice_auto')}
+        >
+          <option value="">{t('voice_auto')}</option>
+          {voices.map((v) => (
+            <option key={v.voiceURI} value={v.voiceURI}>
+              {v.name || v.lang} ({v.lang})
+            </option>
+          ))}
+        </select>
       )}
+
+      <div className="small text-muted mt-1">{engine === 'server' ? t('server_voice_note') : t('device_voice_note')}</div>
     </div>
   );
 }

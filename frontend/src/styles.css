@@ -39,6 +39,10 @@ body {
   border-radius: 10px;
 }
 
+.voice-picker select {
+  min-width: 0;
+}
+
 .seg {
   display: inline-flex;
   border: 1px solid #ced4da;

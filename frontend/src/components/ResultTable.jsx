@@ -9,7 +9,7 @@ export default function ResultTable({ results, t, lang, onReplay, onNewScan, spe
   return (
     <div id="resultCard" className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-2 gap-2">
-        <h5 className="fw-bold mb-0">{t('results')}</h5>
+        <h5 className="fw-bold mb-0" id="resultsHeading">{t('results')}</h5>
         <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onNewScan}>
           &#8634; {t('new_scan')}
         </button>
@@ -25,7 +25,7 @@ export default function ResultTable({ results, t, lang, onReplay, onNewScan, spe
                 <th scope="col" style={{ width: 190 }}>{t('confidence')}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="resultRows">
               {results.map((r, i) => (
                 <tr key={r.class} className={i === 0 ? 'top-result' : ''}>
                   <td>
@@ -47,20 +47,20 @@ export default function ResultTable({ results, t, lang, onReplay, onNewScan, spe
         </div>
       </div>
 
-      <div className={`alert alert-light border remedy-card mt-3${speaking ? ' speaking' : ''}`}>
+      <div className={`alert alert-light border remedy-card mt-3${speaking ? ' speaking' : ''}`} id="remedyCard">
         <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
-          <div className="small fw-bold text-uppercase text-secondary">
+          <div className="small fw-bold text-uppercase text-secondary" id="topDiseaseLabel">
             {t('remedy_for')} {topName}
           </div>
-          <button type="button" className="btn btn-sm btn-outline-success" onClick={onReplay}>
+          <button type="button" className="btn btn-sm btn-outline-success" id="replayBtn" onClick={onReplay}>
             &#9835; {t('replay')}
           </button>
         </div>
-        <div style={{ fontSize: '.95rem' }}>{topRemedy}</div>
+        <div id="remedyText" style={{ fontSize: '.95rem' }}>{topRemedy}</div>
       </div>
 
       {top.confidence < 60 && (
-        <div className="alert alert-warning mt-3 mb-0">{t('low_confidence')}</div>
+        <div className="alert alert-warning mt-3 mb-0" id="lowConfWarn">{t('low_confidence')}</div>
       )}
     </div>
   );
