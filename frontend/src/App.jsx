@@ -5,7 +5,6 @@ import VoicePicker from './components/VoicePicker.jsx';
 import { API_URL, fetchUi, isLocalDev, predict } from './lib/api.js';
 import { translator } from './lib/i18n.js';
 import { useSpeech } from './lib/useSpeech.js';
-import { voicesFor } from './lib/voices.js';
 
 export default function App() {
   const [lang, setLang] = useState('en');
@@ -19,14 +18,8 @@ export default function App() {
   const inputRef = useRef(null);
 
   const t = useMemo(() => translator(apiUi, lang), [apiUi, lang]);
-  const {
-    speak, stop, speaking, note, setNote, supported,
-    voices, preferred, setPreferred, engine, setEngine,
-  } = useSpeech();
+  const { speak, stop, speaking, note, setNote } = useSpeech();
   const [testing, setTesting] = useState(false);
-
-  // Only offer voices that match the language on screen, so the list stays short.
-  const localVoices = useMemo(() => voicesFor(lang, voices), [lang, voices]);
 
   // Lets the user confirm audio works before uploading anything.
   const testVoice = async () => {
@@ -173,16 +166,7 @@ export default function App() {
         {voice === 'on' && (
           <div className="row g-2 mt-1">
             <div className="col-12">
-              <VoicePicker
-                voices={localVoices}
-                value={preferred}
-                onChange={setPreferred}
-                engine={engine}
-                onEngineChange={setEngine}
-                onTest={testVoice}
-                testing={testing}
-                t={t}
-              />
+              <VoicePicker onTest={testVoice} testing={testing} t={t} />
             </div>
           </div>
         )}
