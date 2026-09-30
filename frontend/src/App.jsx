@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import SegmentedToggle from './components/SegmentedToggle.jsx';
 import ResultTable from './components/ResultTable.jsx';
+import VoicePicker from './components/VoicePicker.jsx';
 import { API_URL, fetchUi, isLocalDev, predict } from './lib/api.js';
 import { translator } from './lib/i18n.js';
 import { useSpeech } from './lib/useSpeech.js';
+import { voicesFor } from './lib/voices.js';
 
 export default function App() {
   const [lang, setLang] = useState('en');
@@ -17,7 +19,11 @@ export default function App() {
   const inputRef = useRef(null);
 
   const t = useMemo(() => translator(apiUi, lang), [apiUi, lang]);
-  const { speak, stop, speaking, note, setNote, supported } = useSpeech();
+  const { speak, stop, speaking, note, setNote, supported, voices, preferred, setPreferred } =
+    useSpeech();
+
+  // Only offer voices that match the language on screen, so the list stays short.
+  const localVoices = useMemo(() => voicesFor(lang, voices), [lang, voices]);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -114,13 +120,16 @@ export default function App() {
     if (inputRef.current) inputRef.current.focus();
   };
 
+  // Explain the audio path only when one is actually needed.
   const voiceHint =
     voice !== 'on'
       ? ''
-      : !supported
-        ? t('server_voice_note')
-        : apiUp === false
-          ? t('no_voice_and_no_server')
+      : localVoices.length > 0
+        ? ''
+        : supported
+          ? apiUp === false
+            ? t('no_voice_and_no_server')
+            : t('server_voice_note')
           : t('server_voice_note');
 
   return (
@@ -160,6 +169,20 @@ export default function App() {
             />
           </div>
         </div>
+        {voice === 'on' && (
+          <div className="row g-2 mt-1">
+            <div className="col-12">
+              <VoicePicker
+                voices={localVoices}
+                value={preferred}
+                onChange={setPreferred}
+                t={t}
+                lang={lang}
+                autoLabel={t('voice_auto')}
+              />
+            </div>
+          </div>
+        )}
         {(voiceHint || note) && <div className="small text-muted mt-2">{note || voiceHint}</div>}
       </div>
 

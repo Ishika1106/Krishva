@@ -111,6 +111,12 @@ UI_TEXT = {
         "voice": "Voice output",
         "voice_on": "On",
         "voice_off": "Off",
+        "voice_choice": "Voice",
+        "voice_auto": "Automatic (best available)",
+        "no_local_voice": (
+            "No voice on this device for this language, so audio comes from "
+            "the server. This needs an internet connection."
+        ),
         "preview": "Predicted disease",
         "low_confidence": "Confidence is low. The photo may be blurry or badly lit. Try again with a clearer photo of a single leaf.",
         "no_remedy": "No remedy info available.",
@@ -144,6 +150,12 @@ UI_TEXT = {
         "voice": "आवाज़",
         "voice_on": "चालू",
         "voice_off": "बंद",
+        "voice_choice": "आवाज़",
+        "voice_auto": "स्वतः (उपलब्ध सर्वश्रेष्ठ)",
+        "no_local_voice": (
+            "इस डिवाइस पर इस भाषा की कोई आवाज़ नहीं है, इसलिए आवाज़ सर्वर से आएगी। "
+            "इसके लिए इंटरनेट चाहिए।"
+        ),
         "preview": "पहचानी गई बीमारी",
         "low_confidence": "विश्वास स्तर कम है। फोटो धुँधली या अंधेरे में हो सकती है। एक साफ़ पत्ती की फोटो के साथ फिर कोशिश करें।",
         "no_remedy": "कोई उपाय जानकारी उपलब्ध नहीं है।",
@@ -234,18 +246,83 @@ async def predict_api(file: UploadFile = File(...)):
     return JSONResponse({"results": results, "ui": UI_TEXT})
 
 
+def _tts_gTTS(text, lang):
+    """Online path: Google Translate TTS. Needs internet."""
+    import tempfile
+    from gtts import gTTS
+
+    handle, path = tempfile.mkstemp(suffix=".mp3")
+    os.close(handle)
+    try:
+        gTTS(text=text, lang=lang).save(path)
+        with open(path, "rb") as fh:
+            return fh.read(), "audio/mpeg"
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def _tts_say(text, lang):
+    """
+    Offline path using the macOS 'say' command.
+
+    gTTS fails with no internet, and Chrome often refuses to expose the
+    hi-IN voice to speechSynthesis, so Hindi went silent. macOS ships the
+    Lekha (hi_IN) voice already, so this always works offline. Returns
+    audio/x-aiff because aiff is what 'say' produces and every browser on
+    macOS and Windows plays it.
+    """
+    import subprocess
+    import tempfile
+
+    # 'say' needs a voice per language; fall back to any that exists.
+    wanted = "Lekha" if lang == "hi" else "Samantha"
+    available = subprocess.run(
+        ["say", "-v", "?"], capture_output=True, text=True
+    ).stdout
+    voice = wanted if wanted in available else None
+    if voice is None:
+        for line in available.splitlines():
+            if line.strip().endswith(lang) or (lang == "hi" and "hi_IN" in line):
+                voice = line.split()[0]
+                break
+
+    handle, path = tempfile.mkstemp(suffix=".aiff")
+    os.close(handle)
+    try:
+        # No --data-format flag: 'say' rejects it here and writes no file.
+        cmd = (["say", "-v", voice] if voice else []) + ["-o", path, text]
+        done = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if done.returncode != 0 or not os.path.getsize(path):
+            raise RuntimeError(done.stderr.strip() or "say failed")
+
+        # Convert to WAV: every browser on every OS plays WAV, whereas
+        # Android's media stack is unreliable with AIFF.
+        wav = path + ".wav"
+        conv = subprocess.run(
+            ["afconvert", "-f", "WAVE", "-d", "LEI16@22030", path, wav],
+            capture_output=True, text=True, timeout=60,
+        )
+        if conv.returncode == 0 and os.path.getsize(wav):
+            with open(wav, "rb") as fh:
+                return fh.read(), "audio/wav"
+        with open(path, "rb") as fh:
+            return fh.read(), "audio/aiff"
+    finally:
+        for p in (path, path + ".wav"):
+            if os.path.exists(p):
+                os.remove(p)
+
+
 @app.post("/api/speak")
 async def speak_api(payload: dict = None):
     """
-    Text-to-speech, returns an audio/mpeg body.
+    Text-to-speech, returns an audio body.
 
-    The browser's built-in speechSynthesis is tried first because it is free
-    and offline. But Chrome on macOS frequently fails to expose non-English
-    voices to it, which is why Hindi came out silent. This endpoint is the
-    reliable fallback: gTTS generates real Hindi audio and the browser just
-    plays the MP3 it receives.
-
-    Requires an internet connection because gTTS calls Google.
+    Order matters: gTTS first because it sounds better, then the macOS 'say'
+    command as an offline fallback. Returning a 503 here is what made voice
+    appear broken, because the browser's own speechSynthesis had already
+    failed silently and this was the last fallback.
     """
     payload = payload or {}
     text = str(payload.get("text", "")).strip()
@@ -261,32 +338,27 @@ async def speak_api(payload: dict = None):
     if lang not in ("hi", "en"):
         raise HTTPException(status_code=400, detail="lang must be 'hi' or 'en'.")
 
-    try:
-        from gtts import gTTS
-        import tempfile
+    audio, media_type, engine = None, None, None
+    problems = []
 
-        handle, path = tempfile.mkstemp(suffix=".mp3")
-        os.close(handle)
+    for fn, name in ((_tts_gTTS, "gTTS"), (_tts_say, "say")):
         try:
-            gTTS(text=text, lang=lang).save(path)
-            with open(path, "rb") as fh:
-                audio = fh.read()
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
-    except HTTPException:
-        raise
-    except Exception:
-        # No internet, or Google blocked the request.
+            audio, media_type = fn(text, lang)
+            engine = name
+            break
+        except Exception as exc:
+            problems.append(f"{name}: {exc}")
+
+    if audio is None:
         raise HTTPException(
             status_code=503,
-            detail="Server text-to-speech is unavailable. It needs an internet connection.",
+            detail="Text-to-speech failed. " + " | ".join(problems),
         )
 
-    # Return the MP3 inline rather than base64 in JSON. Streaming raw audio
-    # avoids a ~33% size penalty and lets the browser start playing sooner.
+    # Return the audio bytes inline rather than base64 in JSON: no 33% size
+    # penalty and the browser can start playing sooner.
     return Response(
         content=audio,
-        media_type="audio/mpeg",
-        headers={"Cache-Control": "no-store"},
+        media_type=media_type,
+        headers={"Cache-Control": "no-store", "X-TTS-Engine": engine},
     )
