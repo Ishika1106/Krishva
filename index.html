@@ -2,61 +2,182 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Krishva AI - Plant Disease Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Krishva - New Farming</title>
+  <meta name="description" content="Krishva uses deep learning to identify crop diseases from a leaf photo and gives the remedy in English and Hindi.">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background: #F7FFE0; }
     .preview { max-width: 100%; max-height: 300px; display: none; margin-bottom: 16px; }
+    .brand-mark {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 52px; height: 52px; border-radius: 14px;
+      background: linear-gradient(135deg, #198754, #0dcaf0);
+      color: #fff; font-weight: 800; font-size: 1.3rem; letter-spacing: .5px;
+    }
+    .tagline { color: #557a2f; font-size: .95rem; margin-top: -6px; }
+    #resultCard { display: none; }
+    .rank-1 { border-left: 6px solid #198754; }
+    .rank-2 { border-left: 6px solid #ffc107; }
+    .rank-3 { border-left: 6px solid #adb5bd; }
   </style>
 </head>
 <body>
-  <div class="container py-5">
-    <h2 class="mb-4 text-success">Krishva AI - Predict Crop Disease</h2>
+  <div class="container py-5" style="max-width: 640px;">
+
+    <div class="d-flex align-items-center gap-3 mb-1">
+      <div class="brand-mark">Kr</div>
+      <div>
+        <h2 class="mb-0 text-success fw-bold">Krishva</h2>
+        <div class="tagline"><em>Krish</em> (farming) + <em>Nova</em> (new) = New Farming</div>
+      </div>
+    </div>
+    <p class="text-muted mt-3">Upload a photo of a single leaf and Krishva will identify the
+      disease, show how confident it is, and give you the remedy in English and Hindi.</p>
+
     <form id="uploadForm">
       <input type="file" class="form-control mb-2" id="imageInput" accept="image/*" required>
-      <img id="preview" class="preview rounded" src="#" alt="preview">
-      <button type="submit" class="btn btn-success w-100 fw-bold mb-3">Analyze</button>
+      <img id="preview" class="preview rounded border" src="#" alt="preview of the leaf you selected">
+      <button type="submit" class="btn btn-success w-100 fw-bold mb-3" id="analyzeBtn">
+        Analyze Leaf
+      </button>
     </form>
-    <div id="loading" style="display:none">Loading...</div>
-    <div id="outputBox" class="mt-4"></div>
+
+    <div id="loading" style="display:none">
+      <div class="alert alert-info">Analyzing the leaf, please wait...</div>
+    </div>
+
+    <div id="errorBox"></div>
+
+    <div id="resultCard" class="mt-4">
+      <h5 class="fw-bold">Results</h5>
+      <div id="outputBox"></div>
+      <div id="hindiBox" class="alert alert-light border mt-3"></div>
+    </div>
+
+    <hr class="my-4">
+    <p class="text-muted small mb-0">
+      Krishva - MobileNetV2 (transfer learning) on 20,764 leaf images across 15 crop
+      disease classes, served with FastAPI.
+    </p>
+
   </div>
 
   <script>
-    // Show preview when image selected
-    document.getElementById('imageInput').addEventListener('change', function(e) {
-      let file = e.target.files[0];
-      if (file) {
-        let reader = new FileReader();
-        reader.onload = evt => {
-          let preview = document.getElementById('preview');
-          preview.src = evt.target.result;
-          preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-      }
+    const API_URL = 'http://localhost:8000/api/predict';
+
+    // Show a preview when an image is chosen.
+    document.getElementById('imageInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (evt) {
+        const preview = document.getElementById('preview');
+        preview.src = evt.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
     });
 
-    // On form submit, send image to FastAPI backend
-    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    function showError(message) {
+      const box = document.getElementById('errorBox');
+      box.textContent = message;              // textContent, not innerHTML
+      box.className = 'alert alert-danger';
+      document.getElementById('resultCard').style.display = 'none';
+    }
+
+    // Build one result row using DOM methods instead of an HTML string.
+    // The API's class names are inserted as text nodes, so a stray character
+    // in a label can never be parsed as markup.
+    function addResult(result, rank) {
+      const alert = document.createElement('div');
+      alert.className = 'alert alert-success rank-' + rank;
+
+      const title = document.createElement('div');
+      title.className = 'fw-bold';
+
+      const label = result.label || result.class;
+      title.appendChild(document.createTextNode(label));
+
+      const conf = document.createElement('div');
+      conf.className = 'small text-muted';
+      conf.textContent = 'Confidence: ' + result.confidence + ' %';
+
+      const remedy = document.createElement('div');
+      remedy.className = 'mt-2';
+      remedy.appendChild(document.createTextNode(result.remedy || 'No remedy info available.'));
+
+      alert.appendChild(title);
+      alert.appendChild(conf);
+      alert.appendChild(remedy);
+      document.getElementById('outputBox').appendChild(alert);
+      return remedy.textContent;
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+      // Stop the browser's default full-page form submit.
       e.preventDefault();
-      let file = document.getElementById('imageInput').files[0];
+
+      const fileInput = document.getElementById('imageInput');
+      const file = fileInput.files[0];
       if (!file) return;
+
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = true;
       document.getElementById('loading').style.display = 'block';
+      document.getElementById('errorBox').textContent = '';
+      document.getElementById('outputBox').textContent = '';
+      document.getElementById('resultCard').style.display = 'none';
+
+      // FormData is required. Without it the bytes have no multipart
+      // boundary and FastAPI cannot parse the file. Do not set Content-Type
+      // yourself, the browser must add the boundary.
       const formData = new FormData();
       formData.append('file', file);
-      // POST to backend API
-      const res = await fetch('http://localhost:8000/api/predict', { method: 'POST', body: formData });
-      const data = await res.json();
-      document.getElementById('loading').style.display = 'none';
-      let html = "";
-      if(data.results) {
-        data.results.forEach(r => {
-          html += `<div class="alert alert-success">
-            <b>${r.class}</b> — Confidence: ${r.confidence}%<br> Remedys: ${r.remedy}
-            </div>`;
+
+      try {
+        const res = await fetch(API_URL, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.detail || 'The server rejected that image.');
+          return;
+        }
+        if (!data.results || !data.results.length) {
+          showError('No prediction was returned.');
+          return;
+        }
+
+        let topRemedy = '';
+        data.results.forEach(function (r, i) {
+          if (i === 0) topRemedy = addResult(r, i + 1);
+          else addResult(r, i + 1);
         });
+
+        // Show the Hindi remedy for the top result.
+        const hindiBox = document.getElementById('hindiBox');
+        hindiBox.textContent = data.results[0].remedy_hi || '';
+        hindiBox.style.display = data.results[0].remedy_hi ? 'block' : 'none';
+
+        document.getElementById('resultCard').style.display = 'block';
+
+        if (data.results[0].confidence < 60) {
+          const warn = document.createElement('div');
+          warn.className = 'alert alert-warning mt-3';
+          warn.textContent =
+            'Confidence is low. The photo may be blurry or badly lit. ' +
+            'Try again with a clearer photo of a single leaf.';
+          document.getElementById('resultCard').appendChild(warn);
+        }
+      } catch (err) {
+        showError(
+          'Could not reach the Krishva API. Make sure the backend is running: ' +
+          'uvicorn main:app --reload'
+        );
+      } finally {
+        btn.disabled = false;
+        document.getElementById('loading').style.display = 'none';
       }
-      document.getElementById('outputBox').innerHTML = html;
     });
   </script>
 </body>

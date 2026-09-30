@@ -1,0 +1,36 @@
+# Krishva - Crop Disease Detection System
+# Python 3.10.10
+#
+# Install everything with:
+#     pip install -r requirements.txt
+#
+# Versions are pinned so the project is reproducible on another machine.
+
+# --- Deep learning core -------------------------------------------------
+tensorflow==2.20.0        # includes keras 3.10.0
+numpy==2.2.6              # array maths
+pillow==11.3.0            # image decoding, used by check_corrupted.py
+
+# --- Class imbalance (compute_class_weight) ------------------------------
+# The original train_model.py imported sklearn but this package was never
+# installed, so training crashed on line 23 with ModuleNotFoundError.
+scikit-learn==1.7.2
+scipy==1.15.3
+
+# --- Web backend --------------------------------------------------------
+fastapi==0.121.0
+uvicorn==0.38.0
+python-multipart==0.0.20  # REQUIRED for FastAPI to accept file uploads
+
+# --- Text to speech -----------------------------------------------------
+gTTS==2.5.4               # Hindi, needs internet
+requests==2.32.4          # used by gTTS
+pyttsx3==2.99             # English, offline, macOS/Windows only
+
+# --- Reporting ----------------------------------------------------------
+matplotlib==3.10.3        # confidence bar chart
+
+# --- macOS only ---------------------------------------------------------
+# pyttsx3 talks to the OS speech engine through PyObjC. These come in
+# automatically with pyttsx3 on macOS; on Linux/Windows install the
+# system TTS engine instead (espeak or a NLTK voice).

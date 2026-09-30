@@ -1,130 +1,232 @@
+"""
+Krishva - command line crop disease predictor with text-to-speech
+
+Krish (कृषि) = farming   +   Nova (नव) = new   ->   "New Farming"
+
+Same model as the web API, but runs from the terminal and SPEAKS the answer
+out loud. This is the accessibility path: a farmer who cannot read English,
+or who cannot read Devanagari, can still use the remedy.
+
+Usage:
+    python predict.py                 # uses test.JPG
+    python predict.py path/to/leaf.jpg
+    python predict.py leaf.jpg en      # speak in English instead of Hindi
+
+Run with no arguments and it works out of the box.
+"""
+
+import os
+import sys
+import json
+import argparse
+import subprocess
+import tempfile
+
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-import numpy as np
-import os
-import json
 import matplotlib.pyplot as plt
 
-# === Language setting: "en" or "hi"
-language = "hi"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# === Voice libraries
-if language == "hi":
-    from gtts import gTTS
-else:
-    import pyttsx3
+# Must match train_model.py IMAGE_SIZE and main.py IMAGE_SIZE.
+IMAGE_SIZE = (224, 224)
 
-# === Voice functions
+# Kept out of the served predictions. The training run accidentally treated
+# the dataset/duplicates folder as a 16th class; it holds no images so that
+# output unit never learned anything.
+JUNK_CLASSES = {"duplicates"}
+
+
+# --------------------------------------------------------------------------
+# Text-to-speech
+# --------------------------------------------------------------------------
 def speak_hi(text):
-    filename = "remedy_hi.mp3"
-    tts = gTTS(text=text, lang='hi')
-    tts.save(filename)
-    os.system(f"afplay {filename}")
-    os.remove(filename)
+    """Speak Hindi using gTTS (Google). Needs an internet connection."""
+    from gtts import gTTS
+
+    handle, filename = tempfile.mkstemp(suffix=".mp3")
+    os.close(handle)
+    try:
+        gTTS(text=text, lang="hi").save(filename)
+        # subprocess with a list avoids the shell, so a filename containing
+        # spaces or shell characters cannot be interpreted as a command.
+        # afplay is macOS only.
+        subprocess.run(["afplay", filename], check=False)
+    finally:
+        if os.path.exists(filename):
+            os.remove(filename)
+
 
 def speak_en(text):
+    """Speak English using pyttsx3 (offline, macOS/Windows only)."""
+    import pyttsx3
+
     engine = pyttsx3.init()
-    engine.setProperty('rate', 150)
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[132].id)  # Use your preferred voice index
+    engine.setProperty("rate", 150)  # slower than default, easier to follow
+
+    # Pick a voice by NAME, not by a hard-coded index. The old code used
+    # voices[132] which raises IndexError on any machine that does not
+    # happen to have 133 voices installed.
+    voices = engine.getProperty("voices") or []
+    preferred = None
+    for voice in voices:
+        if any(key in voice.name.lower() for key in ("vikram", "hindi", "india")):
+            preferred = voice
+            break
+    if preferred is None and voices:
+        preferred = voices[0]
+    if preferred is not None:
+        engine.setProperty("voice", preferred.id)
+        print(f"   voice: {preferred.name}")
+    else:
+        print("   no TTS voices found on this system, skipping audio")
+
     engine.say(text)
     engine.runAndWait()
 
-# === Load model
-print("🔄 Loading model...")
-model = tf.keras.models.load_model('crop_disease_model.h5')
 
-# === Check image path
-img_path = "test.jpg"
-print("🔍 Checking if test.jpg exists...")
-if not os.path.exists(img_path):
-    print("❌ test.jpg not found!")
-    exit()
+# --------------------------------------------------------------------------
+# Load artefacts once
+# --------------------------------------------------------------------------
+print("Krishva - New Farming")
+print("Loading model...")
+model = tf.keras.models.load_model(os.path.join(SCRIPT_DIR, "crop_disease_model.h5"))
 
-# === Preprocess image
-print("🖼️ Preprocessing image...")
-img = image.load_img(img_path, target_size=(224, 224))
-img_array = image.img_to_array(img) / 255.0
-img_array = np.expand_dims(img_array, axis=0)
-
-# === Predict
-print("🧠 Predicting...")
-predictions = model.predict(img_array)[0]
-
-# === Load class names
-with open("class_names.json", "r") as f:
+with open(os.path.join(SCRIPT_DIR, "class_names.json"), "r", encoding="utf-8") as f:
     class_indices = json.load(f)
+
+# class_names.json is name -> index, but the model predicts indices, so flip it.
 index_to_class = {int(v): k for k, v in class_indices.items()}
 
-# === Top 3 predictions
-top_indices = predictions.argsort()[-3:][::-1]
-print("\n📊 Top 3 Predictions:")
-for i, idx in enumerate(top_indices):
-    class_name = index_to_class[idx]
-    confidence = round(100 * predictions[idx], 2)
-    print(f"{i+1}. {class_name} - {confidence}%")
+# Remedies now live in one JSON file shared with the web API, so the two
+# cannot drift apart. The old code had two separate Python dicts and had
+# already lost the Tomato_late_blight entry.
+with open(os.path.join(SCRIPT_DIR, "remedies.json"), "r", encoding="utf-8") as f:
+    remedies = json.load(f)
 
-# === Top prediction info
-top_class = index_to_class[top_indices[0]]
-top_confidence = round(100 * predictions[top_indices[0]], 2)
+valid_indices = [i for i in sorted(index_to_class) if index_to_class[i] not in JUNK_CLASSES]
+
+
+# --------------------------------------------------------------------------
+# Arguments
+# --------------------------------------------------------------------------
+parser = argparse.ArgumentParser(description="Krishva crop disease predictor")
+parser.add_argument("image", nargs="?", default=None, help="path to a leaf image")
+parser.add_argument(
+    "--lang",
+    choices=["hi", "en"],
+    default="hi",
+    help="language for the spoken remedy (default: hi)",
+)
+args = parser.parse_args()
+
+# Fall back to the bundled sample. os.path.join keeps it case-correct; the
+# old code hard-coded "test.jpg" while the file on disk is "test.JPG",
+# which only worked because macOS filesystems are case-insensitive.
+if args.image is None:
+    img_path = os.path.join(SCRIPT_DIR, "test.JPG")
+    if not os.path.exists(img_path):
+        print(f"Sample image not found: {img_path}")
+        sys.exit(1)
+else:
+    img_path = args.image
+    if not os.path.exists(img_path):
+        print(f"Image not found: {img_path}")
+        sys.exit(1)
+
+
+# --------------------------------------------------------------------------
+# Preprocess, predict, explain
+# --------------------------------------------------------------------------
+print("Preprocessing image...")
+img = image.load_img(img_path, target_size=IMAGE_SIZE)
+# /255.0 MUST match rescale=1./255 in train_model.py.
+img_array = image.img_to_array(img) / 255.0
+# add the batch dimension: (224,224,3) -> (1,224,224,3)
+img_array = np.expand_dims(img_array, axis=0)
+
+print("Predicting...")
+predictions = model.predict(img_array, verbose=0)[0]
+
+# Rank the real classes, best first.
+ranked = sorted(valid_indices, key=lambda i: predictions[i], reverse=True)
+top_indices = ranked[:3]
+
+print(f"\nTop {len(top_indices)} predictions for {os.path.basename(img_path)}:")
+for position, idx in enumerate(top_indices, start=1):
+    class_name = index_to_class[idx]
+    # float() because predictions[idx] is a numpy.float32 and f-strings can
+    # print it but json.dumps cannot.
+    confidence = round(float(100 * predictions[idx]), 2)
+    print(f"  {position}. {class_name.replace('_', ' '):<45s} {confidence:>6.2f} %")
+
+top_idx = top_indices[0]
+top_class = index_to_class[top_idx]
+top_confidence = round(float(100 * predictions[top_idx]), 2)
 readable_label = top_class.replace("_", " ")
 
-# === Remedies
-english_remedies = {
-    "Tomato_target_spot": "Use crop rotation, remove infected debris, and apply fungicides like azoxystrobin or chlorothalonil.",
-    "Tomato_tomato_mosaic_virus": "Disinfect gardening tools, avoid handling plants after using tobacco, and plant resistant varieties.",
-    "Tomato_tomato_yellowleaf_curl_virus": "Control whiteflies using sticky traps, remove infected plants, and use resistant seeds.",
-    "Tomato_bacterial_spot": "Remove affected leaves, avoid overhead watering, and apply copper-based bactericides weekly.",
-    "Tomato_early_blight": "Apply fungicides like chlorothalonil or mancozeb, use mulch to avoid soil splash, and rotate crops.",
-    "Tomato_healthy": "No issues found. Maintain healthy watering, spacing, and regular leaf inspection.",
-    "Tomato_leaf_mold": "Increase air circulation, avoid wetting leaves, and use sulfur-based fungicides.",
-    "Tomato_septoria_leaf_spot": "Remove lower infected leaves, avoid watering from above, and apply fungicides like chlorothalonil.",
-    "Tomato_spider_mites_two_spotted_spider_mite": "Spray neem oil or insecticidal soap, increase humidity, and prune heavily infested leaves.",
-    "Pepper_bell_bacterial_spot": "Use garlic extract spray or neem oil. Avoid overhead watering and ensure good plant airflow.",
-    "Pepper_bell_healthy": "Maintain good airflow, avoid overwatering, and apply compost tea or neem oil monthly.",
-    "Potato_early_blight": "Spray baking soda solution. Use neem oil weekly and remove infected leaves early.",
-    "Potato_late_blight": "Spray diluted milk. Remove infected leaves and improve airflow.",
-    "Potato_healthy": "Apply mulch with compost or wood ash. Use crop rotation and natural fertilizers."
-}
+remedy = remedies.get(top_class, {})
+remedy_en = remedy.get("en", "No remedy info available.")
+remedy_hi = remedy.get("hi", "कोई उपाय जानकारी उपलब्ध नहीं है।")
 
-hindi_remedies = {
-    "Tomato_target_spot": "फसल चक्र अपनाएं, संक्रमित पत्तियाँ हटाएं और एज़ॉक्सीस्ट्रोबिन या क्लोरोथालोनिल का छिड़काव करें।",
-    "Tomato_tomato_mosaic_virus": "उपकरणों को साफ करें, तंबाकू के बाद पौधों को न छुएं, और प्रतिरोधी किस्में लगाएं।",
-    "Tomato_tomato_yellowleaf_curl_virus": "सफेद मक्खियों को नियंत्रित करें, संक्रमित पौधों को हटा दें और प्रतिरोधी बीजों का उपयोग करें।",
-    "Tomato_bacterial_spot": "संक्रमित पत्तियाँ हटाएं, ऊपर से पानी न डालें और तांबे पर आधारित कीटनाशकों का उपयोग करें।",
-    "Tomato_early_blight": "क्लोरोथालोनिल या मैंकोजे़ब का छिड़काव करें, गीली घास डालें और फसल चक्र अपनाएं।",
-    "Tomato_healthy": "कोई समस्या नहीं है। पौधे को सही तरीके से पानी दें और नियमित जांच करें।",
-    "Tomato_leaf_mold": "हवा का प्रवाह बढ़ाएं, पत्तों को न भिगोएं, और सल्फर-आधारित फफूंदनाशकों का उपयोग करें।",
-    "Tomato_septoria_leaf_spot": "नीचे की संक्रमित पत्तियाँ हटाएं, ऊपर से पानी देने से बचें और क्लोरोथालोनिल का उपयोग करें।",
-    "Tomato_spider_mites_two_spotted_spider_mite": "नीम ऑयल या कीटनाशक साबुन का छिड़काव करें, नमी बढ़ाएं और संक्रमित पत्तियों को काटें।",
-    "Pepper_bell_bacterial_spot": "नीम ऑयल या लहसुन के अर्क का छिड़काव करें और पत्तियों को सूखा रखें।",
-    "Pepper_bell_healthy": "हवा का संचार अच्छा रखें और पौधों को ज़्यादा पानी न दें।",
-    "Potato_early_blight": "बेकिंग सोडा और पानी का घोल छिड़कें, नीम ऑयल का नियमित उपयोग करें और संक्रमित पत्तियाँ हटाएं।",
-    "Potato_late_blight": "दूध और पानी का घोल छिड़कें, संक्रमित पत्तियाँ हटाएं और हवा का प्रवाह बढ़ाएं।",
-    "Potato_healthy": "जैविक खाद और फसल चक्र का पालन करें। पौधा स्वस्थ है।"
-}
+print(f"\nPrediction : {readable_label}  ({top_confidence} %)")
+print(f"Remedy (EN): {remedy_en}")
+print(f"Remedy (HI): {remedy_hi}")
 
-remedy_en = english_remedies.get(top_class, "No remedy info available.")
-remedy_hi = hindi_remedies.get(top_class, "कोई उपाय जानकारी उपलब्ध नहीं है।")
+# If the model is unsure, say so rather than presenting a guess as fact.
+if top_confidence < 60:
+    print(
+        "\nWARNING: confidence is low. The photo may be blurry, badly lit, "
+        "or the leaf may not belong to any of the 15 known classes. "
+        "Try again with a clearer, well-lit photo."
+    )
 
-# === Speak and print result
-print(f"\n✅ Prediction: {readable_label} ({top_confidence}%)")
-print(f"💡 Remedy: {remedy_hi if language == 'hi' else remedy_en}")
-
-if language == "hi":
-    print("\n🔊 Speaking in Hindi...")
-    speech_text = f"पहचानी गई बीमारी है {readable_label}. विश्वास स्तर है {int(top_confidence)} प्रतिशत. उपाय: {remedy_hi}"
-    speak_hi(speech_text)
+# --------------------------------------------------------------------------
+# Speak the result
+# --------------------------------------------------------------------------
+if args.lang == "hi":
+    spoken = (
+        f"पहचानी गई बीमारी है {readable_label}। "
+        f"विश्वास स्तर है {int(top_confidence)} प्रतिशत। उपाय: {remedy_hi}"
+    )
+    print("\nSpeaking in Hindi...")
+    try:
+        speak_hi(spoken)
+    except Exception as exc:
+        print(f"   Hindi audio unavailable ({exc}). Use --lang en to try English.")
 else:
-    print("\n🔊 Speaking in English...")
-    message = f"The predicted disease is {readable_label}. Confidence is {int(top_confidence)} percent. Remedy: {remedy_en}"
-    speak_en(message)
+    spoken_en = (
+        f"The predicted disease is {readable_label}. "
+        f"Confidence is {int(top_confidence)} percent. Remedy: {remedy_en}"
+    )
+    print("\nSpeaking in English...")
+    try:
+        speak_en(spoken_en)
+    except Exception as exc:
+        print(f"   English audio unavailable ({exc}).")
 
-# === Plot prediction bar chart
-plt.figure(figsize=(10, 4))
-plt.barh(range(len(index_to_class)), predictions, color='skyblue')
-plt.yticks(range(len(index_to_class)), [index_to_class[i] for i in range(len(index_to_class))])
-plt.xlabel("Confidence")
-plt.title("Prediction Confidence per Class")
+# --------------------------------------------------------------------------
+# Confidence bar chart
+# --------------------------------------------------------------------------
+# The old code used len(index_to_class) as the number of bars, which only
+# worked by coincidence. The number of bars must be len(predictions).
+print("\nOpening confidence chart...")
+plt.figure(figsize=(11, 5))
+names = [index_to_class[i].replace("_", " ") for i in valid_indices]
+scores = [predictions[i] * 100 for i in valid_indices]
+bars = plt.barh(range(len(valid_indices)), scores, color="skyblue")
+plt.yticks(range(len(valid_indices)), names)
+plt.xlabel("Confidence (%)")
+plt.title("Krishva - prediction confidence per class")
+plt.gca().invert_yaxis()
 plt.tight_layout()
+for bar in bars:
+    plt.text(
+        bar.get_width() + 0.5,
+        bar.get_y() + bar.get_height() / 2,
+        f"{bar.get_width():.1f}",
+        va="center",
+        fontsize=8,
+    )
 plt.show()

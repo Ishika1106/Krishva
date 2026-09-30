@@ -1,0 +1,62 @@
+{
+  "Potato_healthy": {
+    "en": "The plant is healthy. Apply mulch with compost or wood ash, use crop rotation, and stick to natural fertilizers.",
+    "hi": "पौधा स्वस्थ है। जैविक खाद और फसल चक्र का पालन करें।"
+  },
+  "Potato_early_blight": {
+    "en": "Spray a baking soda and water solution, apply neem oil weekly, and remove infected leaves as soon as they appear.",
+    "hi": "बेकिंग सोडा और पानी का घोल छिड़कें, नीम ऑयल का नियमित उपयोग करें और संक्रमित पत्तियाँ हटाएं।"
+  },
+  "Potato_late_blight": {
+    "en": "Late blight spreads very fast in cool, wet weather. Spray a diluted milk solution, remove and destroy infected leaves, improve air circulation around the plant, and avoid overhead watering.",
+    "hi": "पिछेती झुलसा ठंडे और गीले मौसम में तेजी से फैलता है। दूध और पानी का घोल छिड़कें, संक्रमित पत्तियाँ हटा दें और पौधे के चारों ओर हवा का प्रवाह बढ़ाएं।"
+  },
+  "Pepper_bell_healthy": {
+    "en": "The plant is healthy. Maintain good airflow, avoid overwatering, and apply compost tea or neem oil once a month.",
+    "hi": "पौधा स्वस्थ है। हवा का संचार अच्छा रखें, ज़्यादा पानी न दें और महीने में एक बार कम्पोस्ट टी या नीम ऑयल डालें।"
+  },
+  "Pepper_bell_bacterial_spot": {
+    "en": "Remove affected leaves, avoid overhead watering, and spray a garlic extract or neem oil solution weekly to improve airflow around the plant.",
+    "hi": "संक्रमित पत्तियाँ हटाएं, ऊपर से पानी न डालें और साप्ताहिक नीम ऑयल या लहसुन अर्क का छिड़काव करें।"
+  },
+  "Tomato_healthy": {
+    "en": "No problems found. Keep watering at soil level, maintain good spacing between plants, and inspect the leaves regularly.",
+    "hi": "कोई समस्या नहीं है। ज़मीन पर पानी दें, पौधों के बीच उचित दूरी रखें और नियमित रूप से पत्तियाँ जांचें।"
+  },
+  "Tomato_early_blight": {
+    "en": "Apply fungicides like chlorothalonil or mancozeb, use mulch to stop soil splashing onto the leaves, and rotate crops each season.",
+    "hi": "क्लोरोथालोनिल या मैंकोजे़ब का छिड़काव करें, गीली घास डालें और हर मौसम में फसल चक्र अपनाएं।"
+  },
+  "Tomato_late_blight": {
+    "en": "Remove and destroy all infected leaves immediately, avoid wetting the foliage, keep the plant dry, and apply a preventive fungicide such as chlorothalonil or mancozeb.",
+    "hi": "सभी संक्रमित पत्तियाँ तुरंत हटा दें, पत्तियों पर पानी न पड़ने दें, पौधा सूखा रखें और क्लोरोथालोनिल या मैंकोजे़ब का छिड़काव करें।"
+  },
+  "Tomato_leaf_mold": {
+    "en": "Increase air circulation, avoid wetting the leaves, reduce humidity in the greenhouse, and use sulfur-based fungicides.",
+    "hi": "हवा का प्रवाह बढ़ाएं, पत्तियों को न भिगोएं, ग्रीनहाउस में नमी कम करें और सल्फर-आधारित फफूंदनाशकों का उपयोग करें।"
+  },
+  "Tomato_septoria_leaf_spot": {
+    "en": "Remove the lower infected leaves, avoid watering from above, mulch the soil, and apply fungicides like chlorothalonil.",
+    "hi": "नीचे की संक्रमित पत्तियाँ हटाएं, ऊपर से पानी देने से बचें, मिट्टी में गीली घास डालें और क्लोरोथालोनिल का छिड़काव करें।"
+  },
+  "Tomato_bacterial_spot": {
+    "en": "Remove affected leaves, avoid overhead watering, apply copper-based bactericides weekly, and never work on the plants while they are wet.",
+    "hi": "संक्रमित पत्तियाँ हटाएं, ऊपर से पानी न डालें, हर सप्ताह तांबे पर आधारित कीटनाशक डालें और गीले पौधों को न छुएं।"
+  },
+  "Tomato_target_spot": {
+    "en": "Use crop rotation, remove and destroy infected debris, and apply fungicides like azoxystrobin or chlorothalonil.",
+    "hi": "फसल चक्र अपनाएं, संक्रमित पत्तियाँ और अवशेष हटाएं तथा एज़ॉक्सीस्ट्रोबिन या क्लोरोथालोनिल का छिड़काव करें।"
+  },
+  "Tomato_spider_mites_two_spotted_spider_mite": {
+    "en": "Spray neem oil or insecticidal soap, increase humidity around the plant, and prune the heavily infested leaves.",
+    "hi": "नीम ऑयल या कीटनाशक साबुन का छिड़काव करें, नमी बढ़ाएं और भारी संक्रमण वाली पत्तियाँ काट दें।"
+  },
+  "Tomato_tomato_mosaic_virus": {
+    "en": "There is no cure for this virus. Disinfect all gardening tools, avoid handling plants after using tobacco products, remove infected plants, and plant resistant varieties.",
+    "hi": "इस वायरस का कोई इलाज नहीं है। उपकरणों को साफ करें, तंबाकू का उपयोग करने के बाद पौधों को न छुएं, संक्रमित पौधे हटाएं और प्रतिरोधी किस्में लगाएं।"
+  },
+  "Tomato_tomato_yellowleaf_curl_virus": {
+    "en": "There is no cure for this virus. Control whiteflies with sticky traps, remove and destroy infected plants, and use virus-resistant seed varieties.",
+    "hi": "इस वायरस का कोई इलाज नहीं है। सफेद मक्खियों को चिपचिपे ट्रैप से नियंत्रित करें, संक्रमित पौधे हटा दें और वायरस-रोधी बीजों का उपयोग करें।"
+  }
+}
