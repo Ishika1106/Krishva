@@ -40,15 +40,20 @@ app = FastAPI(
     version="1.2.0",
 )
 
-# CORS is needed because the frontend is served from port 5500 while this API
-# runs on port 8000. Origins are listed explicitly instead of using "*" so
-# that credentials can be enabled safely (the CORS spec forbids combining a
-# wildcard origin with allow_credentials=True).
+# CORS is needed because the frontend runs on a different port than this API.
+# 5500 is the old static server; 5173 is the Vite dev server; the LAN address
+# is for testing a phone on the same Wi-Fi. Origins are listed explicitly
+# because the CORS spec forbids a wildcard with allow_credentials=True.
+# Add your deployed frontend's origin here when you host it.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5500",
         "http://127.0.0.1:5500",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://192.168.1.168:5173",
+        "http://192.168.1.168:5500",
     ],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],

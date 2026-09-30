@@ -1,0 +1,138 @@
+:root {
+  --kr-green: #198754;
+  --kr-leaf: #f7ffe0;
+}
+
+body {
+  background: var(--kr-leaf);
+}
+
+.preview {
+  max-width: 100%;
+  max-height: 300px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, #198754, #0dcaf0);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.3rem;
+}
+
+.tagline {
+  color: #557a2f;
+  font-size: 0.9rem;
+}
+
+.setting-card {
+  background: #fff;
+  border: 1px solid #e3e8dc;
+  border-radius: 10px;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: 0;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #fff;
+  color: #495057;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg button + button {
+  border-left: 1px solid #ced4da;
+}
+
+.seg button.active {
+  background: var(--kr-green);
+  color: #fff;
+}
+
+.seg button:not(.active):hover {
+  background: #eef7ee;
+}
+
+.top-result {
+  background: #eaf7ec;
+}
+
+.top-result td {
+  font-weight: 600;
+}
+
+.rank-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: #adb5bd;
+}
+
+.rank-pill.r1 { background: #198754; }
+.rank-pill.r2 { background: #ffc107; color: #212529; }
+.rank-pill.r3 { background: #6c757d; }
+
+.bar-cell {
+  min-width: 130px;
+}
+
+.conf-bar {
+  position: relative;
+  height: 20px;
+  border-radius: 4px;
+  background: #e9ecef;
+  overflow: hidden;
+}
+
+.conf-bar > span {
+  display: block;
+  height: 100%;
+  background: #198754;
+}
+
+.conf-bar.mid > span { background: #ffc107; }
+.conf-bar.low > span { background: #dc3545; }
+
+.conf-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.remedy-card {
+  border-left: 5px solid var(--kr-green);
+}
+
+.speaking {
+  animation: kr-pulse 1s ease-in-out infinite;
+}
+
+@keyframes kr-pulse {
+  50% { box-shadow: 0 0 0 6px rgba(13, 202, 240, 0.28); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speaking { animation: none; }
+}
