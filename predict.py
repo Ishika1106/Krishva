@@ -99,11 +99,12 @@ with open(os.path.join(SCRIPT_DIR, "class_names.json"), "r", encoding="utf-8") a
 # class_names.json is name -> index, but the model predicts indices, so flip it.
 index_to_class = {int(v): k for k, v in class_indices.items()}
 
-# Remedies now live in one JSON file shared with the web API, so the two
-# cannot drift apart. The old code had two separate Python dicts and had
-# already lost the Tomato_late_blight entry.
-with open(os.path.join(SCRIPT_DIR, "remedies.json"), "r", encoding="utf-8") as f:
-    remedies = json.load(f)
+# Every user-facing string for every disease lives in one JSON file that is
+# shared with the web API, so English and Hindi can never drift apart. The
+# original project had two separate inline Python dicts and had already lost
+# the Tomato_late_blight entry from both.
+with open(os.path.join(SCRIPT_DIR, "disease_info.json"), "r", encoding="utf-8") as f:
+    disease_info = json.load(f)
 
 valid_indices = [i for i in sorted(index_to_class) if index_to_class[i] not in JUNK_CLASSES]
 
@@ -164,13 +165,14 @@ for position, idx in enumerate(top_indices, start=1):
 top_idx = top_indices[0]
 top_class = index_to_class[top_idx]
 top_confidence = round(float(100 * predictions[top_idx]), 2)
-readable_label = top_class.replace("_", " ")
 
-remedy = remedies.get(top_class, {})
-remedy_en = remedy.get("en", "No remedy info available.")
-remedy_hi = remedy.get("hi", "कोई उपाय जानकारी उपलब्ध नहीं है।")
+info = disease_info.get(top_class, {})
+name_en = info.get("name_en", top_class.replace("_", " "))
+name_hi = info.get("name_hi", top_class.replace("_", " "))
+remedy_en = info.get("remedy_en", "No remedy info available.")
+remedy_hi = info.get("remedy_hi", "कोई उपाय जानकारी उपलब्ध नहीं है।")
 
-print(f"\nPrediction : {readable_label}  ({top_confidence} %)")
+print(f"\nPrediction : {name_en}  ({top_confidence} %)")
 print(f"Remedy (EN): {remedy_en}")
 print(f"Remedy (HI): {remedy_hi}")
 
@@ -187,7 +189,7 @@ if top_confidence < 60:
 # --------------------------------------------------------------------------
 if args.lang == "hi":
     spoken = (
-        f"पहचानी गई बीमारी है {readable_label}। "
+        f"पहचानी गई बीमारी है {name_hi}। "
         f"विश्वास स्तर है {int(top_confidence)} प्रतिशत। उपाय: {remedy_hi}"
     )
     print("\nSpeaking in Hindi...")
@@ -197,7 +199,7 @@ if args.lang == "hi":
         print(f"   Hindi audio unavailable ({exc}). Use --lang en to try English.")
 else:
     spoken_en = (
-        f"The predicted disease is {readable_label}. "
+        f"The predicted disease is {name_en}. "
         f"Confidence is {int(top_confidence)} percent. Remedy: {remedy_en}"
     )
     print("\nSpeaking in English...")
@@ -213,7 +215,7 @@ else:
 # worked by coincidence. The number of bars must be len(predictions).
 print("\nOpening confidence chart...")
 plt.figure(figsize=(11, 5))
-names = [index_to_class[i].replace("_", " ") for i in valid_indices]
+names = [disease_info.get(index_to_class[i], {}).get("name_en", index_to_class[i].replace("_", " ")) for i in valid_indices]
 scores = [predictions[i] * 100 for i in valid_indices]
 bars = plt.barh(range(len(valid_indices)), scores, color="skyblue")
 plt.yticks(range(len(valid_indices)), names)

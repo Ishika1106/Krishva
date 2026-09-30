@@ -7,178 +7,349 @@
   <meta name="description" content="Krishva uses deep learning to identify crop diseases from a leaf photo and gives the remedy in English and Hindi.">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background: #F7FFE0; }
+    :root { --kr-green: #198754; --kr-leaf: #F7FFE0; }
+    body { background: var(--kr-leaf); }
     .preview { max-width: 100%; max-height: 300px; display: none; margin-bottom: 16px; }
+
     .brand-mark {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 52px; height: 52px; border-radius: 14px;
+      width: 52px; height: 52px; border-radius: 14px; flex: 0 0 auto;
       background: linear-gradient(135deg, #198754, #0dcaf0);
-      color: #fff; font-weight: 800; font-size: 1.3rem; letter-spacing: .5px;
+      color: #fff; font-weight: 800; font-size: 1.3rem;
     }
-    .tagline { color: #557a2f; font-size: .95rem; margin-top: -6px; }
+    .tagline { color: #557a2f; font-size: .9rem; }
+
+    /* --- language / voice toggle buttons --- */
+    .seg { display: inline-flex; border: 1px solid #ced4da; border-radius: 8px; overflow: hidden; }
+    .seg button {
+      border: 0; padding: .3rem .85rem; font-size: .85rem; font-weight: 600;
+      background: #fff; color: #495057; transition: background .15s, color .15s;
+    }
+    .seg button + button { border-left: 1px solid #ced4da; }
+    .seg button.active { background: var(--kr-green); color: #fff; }
+    .seg button:not(.active):hover { background: #eef7ee; }
+
+    .setting-card { background: #fff; border: 1px solid #e3e8dc; border-radius: 10px; }
+
     #resultCard { display: none; }
     .rank-1 { border-left: 6px solid #198754; }
     .rank-2 { border-left: 6px solid #ffc107; }
     .rank-3 { border-left: 6px solid #adb5bd; }
+    .conf-badge { font-size: .75rem; font-weight: 700; }
+    .speaking { border: 2px solid #0dcaf0; }
   </style>
 </head>
 <body>
-  <div class="container py-5" style="max-width: 640px;">
+  <div class="container py-4" style="max-width: 660px;">
 
+    <!-- header -->
     <div class="d-flex align-items-center gap-3 mb-1">
       <div class="brand-mark">Kr</div>
       <div>
         <h2 class="mb-0 text-success fw-bold">Krishva</h2>
-        <div class="tagline"><em>Krish</em> (farming) + <em>Nova</em> (new) = New Farming</div>
+        <div class="tagline" id="tagline"></div>
       </div>
     </div>
-    <p class="text-muted mt-3">Upload a photo of a single leaf and Krishva will identify the
-      disease, show how confident it is, and give you the remedy in English and Hindi.</p>
 
+    <!-- settings -->
+    <div class="setting-card p-3 my-3">
+      <div class="row g-3 align-items-center">
+        <div class="col-sm-6 d-flex align-items-center justify-content-between gap-2">
+          <span class="small fw-semibold text-secondary" id="langLabel"></span>
+          <div class="seg" id="langToggle" role="group">
+            <button type="button" data-lang="en" class="active">English</button>
+            <button type="button" data-lang="hi">हिन्दी</button>
+          </div>
+        </div>
+        <div class="col-sm-6 d-flex align-items-center justify-content-between gap-2">
+          <span class="small fw-semibold text-secondary" id="voiceLabel"></span>
+          <div class="seg" id="voiceToggle" role="group">
+            <button type="button" data-voice="off" class="active" id="voiceOffBtn"></button>
+            <button type="button" data-voice="on" id="voiceOnBtn"></button>
+          </div>
+        </div>
+      </div>
+      <div class="small text-muted mt-2" id="voiceNote"></div>
+    </div>
+
+    <p class="text-muted" id="intro"></p>
+
+    <!-- upload -->
     <form id="uploadForm">
       <input type="file" class="form-control mb-2" id="imageInput" accept="image/*" required>
-      <img id="preview" class="preview rounded border" src="#" alt="preview of the leaf you selected">
-      <button type="submit" class="btn btn-success w-100 fw-bold mb-3" id="analyzeBtn">
-        Analyze Leaf
-      </button>
+      <img id="preview" class="preview rounded border" src="#" alt="preview">
+      <button type="submit" class="btn btn-success w-100 fw-bold mb-3" id="analyzeBtn"></button>
     </form>
 
     <div id="loading" style="display:none">
-      <div class="alert alert-info">Analyzing the leaf, please wait...</div>
+      <div class="alert alert-info" id="loadingText"></div>
     </div>
-
     <div id="errorBox"></div>
 
+    <!-- results -->
     <div id="resultCard" class="mt-4">
-      <h5 class="fw-bold">Results</h5>
+      <h5 class="fw-bold" id="resultsHeading"></h5>
       <div id="outputBox"></div>
-      <div id="hindiBox" class="alert alert-light border mt-3"></div>
     </div>
 
     <hr class="my-4">
-    <p class="text-muted small mb-0">
-      Krishva - MobileNetV2 (transfer learning) on 20,764 leaf images across 15 crop
-      disease classes, served with FastAPI.
-    </p>
+    <p class="text-muted small mb-0" id="footer"></p>
 
   </div>
 
   <script>
-    const API_URL = 'http://localhost:8000/api/predict';
+    const API_URL = 'http://localhost:8000';
 
-    // Show a preview when an image is chosen.
+    // ---------- state ----------
+    let lang = 'en';        // 'en' or 'hi'
+    let voice = 'off';      // 'off' or 'on'
+    let lastResults = null; // kept so switching language needs no re-upload
+    let uiText = null;      // UI strings fetched from the API
+
+    // ---------- fallbacks, used only if the API is unreachable ----------
+    const FALLBACK_UI = {
+      en: { tagline:'Krish (farming) + Nova (new) = New Farming',
+            intro:'Upload a photo of a single leaf.', analyze:'Analyze Leaf',
+            analyzing:'Analyzing the leaf, please wait...', results:'Results',
+            confidence:'Confidence', remedy:'Remedy', language:'Language',
+            voice:'Voice output', voice_on:'On', voice_off:'Off',
+            low_confidence:'Confidence is low. Try a clearer photo.',
+            no_remedy:'No remedy info available.', footer:'' },
+      hi: { tagline:'कृषि (खेती) + नव (नया) = नई खेती',
+            intro:'एक पत्ती की फोटो अपलोड करें।', analyze:'विश्लेषण करें',
+            analyzing:'विश्लेषण हो रहा है...', results:'परिणाम',
+            confidence:'विश्वास स्तर', remedy:'उपाय', language:'भाषा',
+            voice:'आवाज़', voice_on:'चालू', voice_off:'बंद',
+            low_confidence:'विश्वास स्तर कम है। साफ़ फोटो के साथ फिर कोशिश करें।',
+            no_remedy:'कोई उपाय जानकारी उपलब्ध नहीं है।', footer:'' }
+    };
+
+    const t = (key) => {
+      const src = (uiText && uiText[lang]) || FALLBACK_UI[lang];
+      return src[key] !== undefined ? src[key] : (FALLBACK_UI.en[key] || '');
+    };
+
+    // ---------- speech (browser built-in, no server round trip) ----------
+    const synth = window.speechSynthesis;
+    const speechSupported = !!synth;
+
+    function pickVoice(wantLang) {
+      const voices = synth.getVoices();
+      if (!voices.length) return null;
+      // Prefer an exact hi-IN / en-IN match, then any matching base language.
+      const tag = wantLang === 'hi' ? 'hi' : 'en';
+      return voices.find(v => v.lang && v.lang.toLowerCase() === tag + '-in')
+          || voices.find(v => v.lang && v.lang.toLowerCase().startsWith(tag))
+          || null;
+    }
+
+    function stopSpeaking() {
+      if (speechSupported) synth.cancel();
+    }
+
+    function speak(text) {
+      if (!speechSupported || !text) return;
+      stopSpeaking();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
+      const v = pickVoice(lang);
+      if (v) u.voice = v;
+      u.rate = 0.95;   // slightly slower, easier for a farmer to follow
+      u.pitch = 1;
+      synth.speak(u);
+    }
+
+    // ---------- rendering ----------
+    function renderStatic() {
+      document.documentElement.lang = lang;
+      document.getElementById('tagline').textContent = t('tagline');
+      document.getElementById('langLabel').textContent = t('language');
+      document.getElementById('voiceLabel').textContent = t('voice');
+      document.getElementById('voiceOnBtn').textContent = t('voice_on');
+      document.getElementById('voiceOffBtn').textContent = t('voice_off');
+      document.getElementById('intro').textContent = t('intro');
+      document.getElementById('analyzeBtn').textContent = t('analyze');
+      document.getElementById('loadingText').textContent = t('analyzing');
+      document.getElementById('resultsHeading').textContent = t('results');
+      document.getElementById('footer').textContent = t('footer');
+
+      // voice availability note
+      const note = document.getElementById('voiceNote');
+      if (!speechSupported) {
+        note.textContent = lang === 'hi'
+          ? 'इस ब्राउज़र में आवाज़ की सुविधा नहीं है।'
+          : 'Speech is not supported in this browser.';
+      } else if (voice === 'on' && !pickVoice(lang)) {
+        note.textContent = lang === 'hi'
+          ? 'यह डिवाइस पर हिन्दी आवाज़ नहीं मिली। macOS: सेटिंग्स → एक्सेसिबिलिटी → स्पीच कंटेंट में हिन्दी वॉइस डाउनलोड करें।'
+          : 'No ' + lang.toUpperCase() + ' voice found on this device.';
+      } else {
+        note.textContent = '';
+      }
+
+      document.querySelectorAll('#langToggle button').forEach(b =>
+        b.classList.toggle('active', b.dataset.lang === lang));
+      document.querySelectorAll('#voiceToggle button').forEach(b =>
+        b.classList.toggle('active', b.dataset.voice === voice));
+    }
+
+    function renderResults() {
+      const box = document.getElementById('outputBox');
+      box.textContent = '';
+      if (!lastResults) { document.getElementById('resultCard').style.display = 'none'; return; }
+
+      lastResults.forEach((r, i) => {
+        const name = lang === 'hi' ? r.name_hi : r.name_en;
+        const remedy = lang === 'hi' ? r.remedy_hi : r.remedy_en;
+
+        const card = document.createElement('div');
+        card.className = 'alert alert-success rank-' + (i + 1);
+
+        const head = document.createElement('div');
+        head.className = 'd-flex justify-content-between align-items-start gap-2';
+
+        const title = document.createElement('div');
+        title.className = 'fw-bold';
+        title.textContent = name;   // textContent, never innerHTML
+
+        const badge = document.createElement('span');
+        badge.className = 'conf-badge badge text-bg-' +
+          (r.confidence >= 70 ? 'success' : r.confidence >= 40 ? 'warning' : 'secondary');
+        badge.textContent = t('confidence') + ': ' + r.confidence + '%';
+
+        head.appendChild(title);
+        head.appendChild(badge);
+
+        const remedyHead = document.createElement('div');
+        remedyHead.className = 'small text-uppercase fw-semibold text-secondary mt-2';
+        remedyHead.textContent = t('remedy');
+
+        const remedyText = document.createElement('div');
+        remedyText.textContent = remedy;
+
+        card.appendChild(head);
+        card.appendChild(remedyHead);
+        card.appendChild(remedyText);
+        box.appendChild(card);
+      });
+
+      // low confidence warning
+      if (lastResults[0].confidence < 60) {
+        const w = document.createElement('div');
+        w.className = 'alert alert-warning';
+        w.textContent = t('low_confidence');
+        box.appendChild(w);
+      }
+
+      document.getElementById('resultCard').style.display = 'block';
+    }
+
+    // ---------- toggles ----------
+    document.getElementById('langToggle').addEventListener('click', function (e) {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const prev = lang;
+      lang = btn.dataset.lang;
+      renderStatic();
+      renderResults();               // switch instantly, no re-upload
+      if (voice === 'on' && lastResults) {
+        const top = lastResults[0];
+        speak((lang === 'hi' ? top.name_hi : top.name_en) + '. ' +
+              (lang === 'hi' ? top.remedy_hi : top.remedy_en));
+      }
+      if (prev !== lang) stopSpeaking();
+    });
+
+    document.getElementById('voiceToggle').addEventListener('click', function (e) {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      voice = btn.dataset.voice;
+      renderStatic();
+      if (voice === 'on' && lastResults) {
+        const top = lastResults[0];
+        speak((lang === 'hi' ? top.name_hi : top.name_en) + '. ' +
+              (lang === 'hi' ? top.remedy_hi : top.remedy_en));
+      } else {
+        stopSpeaking();
+      }
+    });
+
+    // ---------- image preview ----------
     document.getElementById('imageInput').addEventListener('change', function (e) {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function (evt) {
-        const preview = document.getElementById('preview');
-        preview.src = evt.target.result;
-        preview.style.display = 'block';
+        const p = document.getElementById('preview');
+        p.src = evt.target.result;
+        p.style.display = 'block';
       };
       reader.readAsDataURL(file);
     });
 
-    function showError(message) {
-      const box = document.getElementById('errorBox');
-      box.textContent = message;              // textContent, not innerHTML
-      box.className = 'alert alert-danger';
-      document.getElementById('resultCard').style.display = 'none';
-    }
-
-    // Build one result row using DOM methods instead of an HTML string.
-    // The API's class names are inserted as text nodes, so a stray character
-    // in a label can never be parsed as markup.
-    function addResult(result, rank) {
-      const alert = document.createElement('div');
-      alert.className = 'alert alert-success rank-' + rank;
-
-      const title = document.createElement('div');
-      title.className = 'fw-bold';
-
-      const label = result.label || result.class;
-      title.appendChild(document.createTextNode(label));
-
-      const conf = document.createElement('div');
-      conf.className = 'small text-muted';
-      conf.textContent = 'Confidence: ' + result.confidence + ' %';
-
-      const remedy = document.createElement('div');
-      remedy.className = 'mt-2';
-      remedy.appendChild(document.createTextNode(result.remedy || 'No remedy info available.'));
-
-      alert.appendChild(title);
-      alert.appendChild(conf);
-      alert.appendChild(remedy);
-      document.getElementById('outputBox').appendChild(alert);
-      return remedy.textContent;
-    }
-
+    // ---------- predict ----------
     document.getElementById('uploadForm').addEventListener('submit', async function (e) {
-      // Stop the browser's default full-page form submit.
-      e.preventDefault();
+      e.preventDefault();   // stop the browser's default full-page submit
 
-      const fileInput = document.getElementById('imageInput');
-      const file = fileInput.files[0];
+      const file = document.getElementById('imageInput').files[0];
       if (!file) return;
 
       const btn = document.getElementById('analyzeBtn');
       btn.disabled = true;
       document.getElementById('loading').style.display = 'block';
       document.getElementById('errorBox').textContent = '';
-      document.getElementById('outputBox').textContent = '';
       document.getElementById('resultCard').style.display = 'none';
 
-      // FormData is required. Without it the bytes have no multipart
-      // boundary and FastAPI cannot parse the file. Do not set Content-Type
-      // yourself, the browser must add the boundary.
+      // FormData is required so the body gets a multipart boundary. Do not set
+      // Content-Type yourself, the browser must add the boundary.
       const formData = new FormData();
       formData.append('file', file);
 
       try {
-        const res = await fetch(API_URL, { method: 'POST', body: formData });
+        const res = await fetch(API_URL + '/api/predict', { method: 'POST', body: formData });
         const data = await res.json();
 
         if (!res.ok) {
-          showError(data.detail || 'The server rejected that image.');
+          const box = document.getElementById('errorBox');
+          box.textContent = data.detail || 'Server error';
+          box.className = 'alert alert-danger';
           return;
         }
-        if (!data.results || !data.results.length) {
-          showError('No prediction was returned.');
-          return;
-        }
+        if (!data.results || !data.results.length) return;
 
-        let topRemedy = '';
-        data.results.forEach(function (r, i) {
-          if (i === 0) topRemedy = addResult(r, i + 1);
-          else addResult(r, i + 1);
-        });
+        uiText = data.ui || uiText;
+        lastResults = data.results;
 
-        // Show the Hindi remedy for the top result.
-        const hindiBox = document.getElementById('hindiBox');
-        hindiBox.textContent = data.results[0].remedy_hi || '';
-        hindiBox.style.display = data.results[0].remedy_hi ? 'block' : 'none';
+        renderStatic();
+        renderResults();
 
-        document.getElementById('resultCard').style.display = 'block';
-
-        if (data.results[0].confidence < 60) {
-          const warn = document.createElement('div');
-          warn.className = 'alert alert-warning mt-3';
-          warn.textContent =
-            'Confidence is low. The photo may be blurry or badly lit. ' +
-            'Try again with a clearer photo of a single leaf.';
-          document.getElementById('resultCard').appendChild(warn);
+        if (voice === 'on') {
+          const top = data.results[0];
+          speak((lang === 'hi' ? top.name_hi : top.name_en) + '. ' +
+                (lang === 'hi' ? top.remedy_hi : top.remedy_en));
         }
       } catch (err) {
-        showError(
-          'Could not reach the Krishva API. Make sure the backend is running: ' +
-          'uvicorn main:app --reload'
-        );
+        const box = document.getElementById('errorBox');
+        box.textContent = t('api_down');
+        box.className = 'alert alert-danger';
       } finally {
         btn.disabled = false;
         document.getElementById('loading').style.display = 'none';
       }
     });
+
+    // ---------- boot: pull UI strings from the API, fall back if offline ----------
+    renderStatic();
+    fetch(API_URL + '/')
+      .then(r => r.json())
+      .then(d => { if (d.ui) { uiText = d.ui; renderStatic(); } })
+      .catch(() => {});
+
+    // Chrome loads voices asynchronously, so refresh the availability note.
+    if (speechSupported) {
+      synth.onvoiceschanged = () => renderStatic();
+      pickVoice(lang);
+    }
   </script>
 </body>
 </html>

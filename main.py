@@ -4,7 +4,7 @@ Krish (कृषि) = farming  +  Nova (नव) = new  ->  "New Farming"
 
 A FastAPI backend that serves the MobileNetV2 crop disease classifier.
 
-Run with:  uvicorn main:app --reload
+Run with:  uvicorn main:app --reload --port 8000
 Then open: http://127.0.0.1:8000/docs   for interactive API docs
 """
 
@@ -32,7 +32,7 @@ app = FastAPI(
         "Upload a leaf photo and get the disease, a confidence percentage "
         "and a remedy in English and Hindi."
     ),
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # CORS is needed because the frontend is served from port 5500 while this API
@@ -52,9 +52,9 @@ app.add_middleware(
 
 
 # --------------------------------------------------------------------------
-# Load the model, the label map and the remedies ONCE at startup.
+# Load artefacts ONCE at startup.
 # Doing this at module level (not inside the request handler) means the
-# 2.4M parameters are deserialised once, and every request reuses a warm model.
+# 2.4M parameters are deserialised once and every request reuses a warm model.
 # --------------------------------------------------------------------------
 model = tf.keras.models.load_model("crop_disease_model.h5")
 
@@ -65,25 +65,70 @@ with open("class_names.json", "r", encoding="utf-8") as f:
 # to index -> name. int() is needed because JSON values arrive as strings.
 index_to_class = {int(v): k for k, v in class_indices.items()}
 
-with open("remedies.json", "r", encoding="utf-8") as f:
-    remedies = json.load(f)
+# disease_info.json is the single source of truth for every piece of user-facing
+# text in both languages, so English and Hindi can never drift apart. It also
+# holds the UI strings the frontend needs to render its own labels.
+with open("disease_info.json", "r", encoding="utf-8") as f:
+    disease_info = json.load(f)
 
 # The training run accidentally picked up dataset/duplicates/ as a 16th class.
-# It holds no images, so this dead output unit can be hidden from the API
-# without retraining. After retraining on a clean dataset this set is empty.
+# It holds no images, so this dead output unit is hidden from the API. After
+# retraining on a clean dataset this set stays empty.
 JUNK_CLASSES = {"duplicates"}
 VALID_INDICES = [i for i in sorted(index_to_class) if index_to_class[i] not in JUNK_CLASSES]
+
+# Interface text, so the frontend never hardcodes English or Hindi.
+UI_TEXT = {
+    "en": {
+        "tagline": "Krish (farming) + Nova (new) = New Farming",
+        "intro": "Upload a photo of a single leaf and Krishva will identify the disease, show how confident it is, and give you the remedy.",
+        "analyze": "Analyze Leaf",
+        "analyzing": "Analyzing the leaf, please wait...",
+        "results": "Results",
+        "confidence": "Confidence",
+        "remedy": "Remedy",
+        "language": "Language",
+        "voice": "Voice output",
+        "voice_on": "On",
+        "voice_off": "Off",
+        "preview": "Predicted disease",
+        "low_confidence": "Confidence is low. The photo may be blurry or badly lit. Try again with a clearer photo of a single leaf.",
+        "no_remedy": "No remedy info available.",
+        "api_down": "Could not reach the Krishva API. Make sure the backend is running: uvicorn main:app --reload",
+        "not_healthy": "Remedy:",
+        "footer": "Krishva - MobileNetV2 (transfer learning) on 20,764 leaf images across 15 crop disease classes, served with FastAPI.",
+    },
+    "hi": {
+        "tagline": "कृषि (खेती) + नव (नया) = नई खेती",
+        "intro": "एक पत्ती की फोटो अपलोड करें और कृष्वा बीमारी की पहचान करेगा, विश्वास स्तर बताएगा और उपाय बताएगा।",
+        "analyze": "विश्लेषण करें",
+        "analyzing": "पत्ती का विश्लेषण हो रहा है, कृपया प्रतीक्षा करें...",
+        "results": "परिणाम",
+        "confidence": "विश्वास स्तर",
+        "remedy": "उपाय",
+        "language": "भाषा",
+        "voice": "आवाज़",
+        "voice_on": "चालू",
+        "voice_off": "बंद",
+        "preview": "पहचानी गई बीमारी",
+        "low_confidence": "विश्वास स्तर कम है। फोटो धुँधली या अंधेरे में हो सकती है। एक साफ़ पत्ती की फोटो के साथ फिर कोशिश करें।",
+        "no_remedy": "कोई उपाय जानकारी उपलब्ध नहीं है।",
+        "api_down": "कृष्वा API से संपर्क नहीं हो पाया। जाँचें कि बैकएंड चल रहा है: uvicorn main:app --reload",
+        "not_healthy": "उपाय:",
+        "footer": "कृष्वा - MobileNetV2 (ट्रांसफर लर्निंग), 20,764 पत्ती फोटो और 15 फसल रोग वर्गों पर, FastAPI से सेवा।",
+    },
+}
 
 
 @app.get("/")
 def root():
-    """Simple health check so you can confirm the server is alive."""
+    """Health check plus the UI strings, so the frontend needs no hardcoding."""
     return {
         "name": "Krishva",
-        "tagline": "Krish (farming) + Nova (new) = New Farming",
         "status": "running",
         "classes": len(VALID_INDICES),
         "docs": "/docs",
+        "ui": UI_TEXT,
     }
 
 
@@ -92,8 +137,8 @@ async def predict_api(file: UploadFile = File(...)):
     """
     Classify an uploaded leaf image.
 
-    Returns the top 3 predictions as
-    {"results": [{"class", "confidence", "remedy_en", "remedy_hi"}, ...]}
+    Both languages are returned for every result, so the frontend can switch
+    language instantly without uploading the image again.
     """
     filename = (file.filename or "").lower()
     if not any(filename.endswith(s) for s in ALLOWED_SUFFIXES):
@@ -135,16 +180,16 @@ async def predict_api(file: UploadFile = File(...)):
         # json.dumps cannot serialise numpy scalars, which raised
         # "TypeError: Object of type float32 is not JSON serializable".
         confidence = round(float(100 * predictions[idx]), 2)
-        remedy = remedies.get(class_name, {})
+        info = disease_info.get(class_name, {})
         results.append(
             {
                 "class": class_name,
-                "label": class_name.replace("_", " "),
                 "confidence": confidence,
-                "remedy": remedy.get("en", "No remedy info available."),
-                "remedy_en": remedy.get("en", "No remedy info available."),
-                "remedy_hi": remedy.get("hi", "कोई उपाय जानकारी उपलब्ध नहीं है।"),
+                "name_en": info.get("name_en", class_name.replace("_", " ")),
+                "name_hi": info.get("name_hi", class_name.replace("_", " ")),
+                "remedy_en": info.get("remedy_en", UI_TEXT["en"]["no_remedy"]),
+                "remedy_hi": info.get("remedy_hi", UI_TEXT["hi"]["no_remedy"]),
             }
         )
 
-    return JSONResponse({"results": results})
+    return JSONResponse({"results": results, "ui": UI_TEXT})
