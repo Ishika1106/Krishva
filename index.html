@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Krishva AI - Plant Disease Demo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #F7FFE0; }
+    .preview { max-width: 100%; max-height: 300px; display: none; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container py-5">
+    <h2 class="mb-4 text-success">Krishva AI - Predict Crop Disease</h2>
+    <form id="uploadForm">
+      <input type="file" class="form-control mb-2" id="imageInput" accept="image/*" required>
+      <img id="preview" class="preview rounded" src="#" alt="preview">
+      <button type="submit" class="btn btn-success w-100 fw-bold mb-3">Analyze</button>
+    </form>
+    <div id="loading" style="display:none">Loading...</div>
+    <div id="outputBox" class="mt-4"></div>
+  </div>
+
+  <script>
+    // Show preview when image selected
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+      let file = e.target.files[0];
+      if (file) {
+        let reader = new FileReader();
+        reader.onload = evt => {
+          let preview = document.getElementById('preview');
+          preview.src = evt.target.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // On form submit, send image to FastAPI backend
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      let file = document.getElementById('imageInput').files[0];
+      if (!file) return;
+      document.getElementById('loading').style.display = 'block';
+      const formData = new FormData();
+      formData.append('file', file);
+      // POST to backend API
+      const res = await fetch('http://localhost:8000/api/predict', { method: 'POST', body: formData });
+      const data = await res.json();
+      document.getElementById('loading').style.display = 'none';
+      let html = "";
+      if(data.results) {
+        data.results.forEach(r => {
+          html += `<div class="alert alert-success">
+            <b>${r.class}</b> — Confidence: ${r.confidence}%<br> Remedys: ${r.remedy}
+            </div>`;
+        });
+      }
+      document.getElementById('outputBox').innerHTML = html;
+    });
+  </script>
+</body>
+</html>

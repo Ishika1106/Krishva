@@ -1,0 +1,50 @@
+# ============================================
+# Krishva - .gitignore
+# ============================================
+
+# Python virtual environment (1.7 GB - never commit this)
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Training dataset (370 MB, 20,764 images).
+# This is the public PlantVillage dataset - download it separately.
+# See "Dataset" section in README.md
+dataset/
+dataset_duplicates/
+
+# Trained model IS committed so the demo runs out of the box.
+# If it ever grows past GitHub's 100 MB file limit, uncomment this:
+# crop_disease_model.h5
+
+# Generated audio files from text-to-speech
+*.mp3
+remedy_hi.mp3
+
+# Generated charts
+*.png
+!docs/*.png
+
+# macOS junk files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Environment / secrets
+.env
+venv.log
+*.log
