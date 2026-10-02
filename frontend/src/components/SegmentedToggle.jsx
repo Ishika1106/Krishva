@@ -1,7 +1,7 @@
 export default function SegmentedToggle({ label, options, value, onChange, name }) {
   return (
     <div className="d-flex align-items-center justify-content-between gap-2 setting-row">
-      <span className="small fw-semibold text-secondary">{label}</span>
+      <span className="small fw-semibold label">{label}</span>
       <div className="seg" role="group" aria-label={label}>
         {options.map((o) => (
           <button

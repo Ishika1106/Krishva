@@ -10,11 +10,6 @@ Run with:  python check_corrupted.py
 
 import os
 from PIL import Image
-
-# Resolve the dataset relative to THIS FILE, so the script works no matter
-# what the current working directory is. The old code used "/dataset",
-# an absolute path from the filesystem root, which does not exist and made
-# os.walk() find nothing while still printing "0 corrupted images".
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(SCRIPT_DIR, "dataset")
 
@@ -22,7 +17,6 @@ corrupted = []
 scanned = 0
 
 for root, dirs, files in os.walk(DATASET_DIR):
-    # The quarantine folder is not a real class, skip it.
     if "duplicates" in os.path.basename(root):
         continue
     for file in files:
@@ -35,8 +29,6 @@ for root, dirs, files in os.walk(DATASET_DIR):
             except Exception:
                 corrupted.append(path)
 
-# Guard against the exact failure this script used to have: reporting
-# "0 problems" when it actually checked nothing.
 if scanned == 0:
     raise SystemExit(
         f"No JPG files found under {DATASET_DIR}. "

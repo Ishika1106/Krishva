@@ -1,4 +1,3 @@
-// Top-3 table plus the remedy for rank 1 only.
 export default function ResultTable({ results, t, lang, onReplay, onNewScan, speaking }) {
   const top = results[0];
   const topName = lang === 'hi' ? top.name_hi : top.name_en;
@@ -9,16 +8,16 @@ export default function ResultTable({ results, t, lang, onReplay, onNewScan, spe
   return (
     <div id="resultCard" className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-2 gap-2">
-        <h5 className="fw-bold mb-0" id="resultsHeading">{t('results')}</h5>
-        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onNewScan}>
+        <h5 className="fw-bold mb-0 section-title" id="resultsHeading">{t('results')}</h5>
+        <button type="button" className="btn btn-sm btn-glass" onClick={onNewScan}>
           &#8634; {t('new_scan')}
         </button>
       </div>
 
-      <div className="card shadow-sm">
+      <div className="glass table-card">
         <div className="table-responsive">
           <table className="table table-sm mb-0 align-middle">
-            <thead className="table-light">
+            <thead>
               <tr>
                 <th scope="col" style={{ width: 52 }}>{t('rank')}</th>
                 <th scope="col">{t('disease')}</th>
@@ -47,20 +46,20 @@ export default function ResultTable({ results, t, lang, onReplay, onNewScan, spe
         </div>
       </div>
 
-      <div className={`alert alert-light border remedy-card mt-3${speaking ? ' speaking' : ''}`} id="remedyCard">
+      <div className={`glass remedy-card mt-3${speaking ? ' speaking' : ''}`} id="remedyCard">
         <div className="d-flex justify-content-between align-items-start gap-2 mb-1">
-          <div className="small fw-bold text-uppercase text-secondary" id="topDiseaseLabel">
+          <div className="small fw-bold text-uppercase remedy-label" id="topDiseaseLabel">
             {t('remedy_for')} {topName}
           </div>
-          <button type="button" className="btn btn-sm btn-outline-success" id="replayBtn" onClick={onReplay}>
+          <button type="button" className="btn btn-sm btn-glass" id="replayBtn" onClick={onReplay}>
             &#9835; {t('replay')}
           </button>
         </div>
-        <div id="remedyText" style={{ fontSize: '.95rem' }}>{topRemedy}</div>
+        <div id="remedyText" className="remedy-text">{topRemedy}</div>
       </div>
 
       {top.confidence < 60 && (
-        <div className="alert alert-warning mt-3 mb-0" id="lowConfWarn">{t('low_confidence')}</div>
+        <div className="glass alert alert-warning mt-3 mb-0" id="lowConfWarn">{t('low_confidence')}</div>
       )}
     </div>
   );

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { speakUrl } from './api.js';
 
-// The server returns a real audio file, so it always plays; speechSynthesis was dropped because Chrome runs it silently.
 export function useSpeech() {
   const [speaking, setSpeaking] = useState(false);
   const [note, setNote] = useState('');

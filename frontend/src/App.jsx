@@ -21,7 +21,6 @@ export default function App() {
   const { speak, stop, speaking, note, setNote } = useSpeech();
   const [testing, setTesting] = useState(false);
 
-  // Lets the user confirm audio works before uploading anything.
   const testVoice = async () => {
     setTesting(true);
     await speak(t('voice_sample'), lang, t);
@@ -61,7 +60,6 @@ export default function App() {
     if (next === lang) return;
     stop();
     setLang(next);
-    // Re-read in the new language without re-uploading.
     if (voice === 'on' && topResult) {
       const r = topResult;
       const L = next === 'hi' ? { name: r.name_hi, remedy: r.remedy_hi } : { name: r.name_en, remedy: r.remedy_en };
@@ -123,97 +121,94 @@ export default function App() {
     if (inputRef.current) inputRef.current.focus();
   };
 
-  // Only warn when the chosen path genuinely cannot work.
   const voiceHint = note || (voice !== 'on' ? '' : apiUp === false ? t('api_down') : '');
 
   return (
-    <div className="container py-4" style={{ maxWidth: 700 }}>
-      <header className="d-flex align-items-center gap-3 mb-1">
-        <div className="brand-mark">Kr</div>
-        <div>
-          <h2 className="mb-0 text-success fw-bold">Krishva</h2>
-          <div className="tagline">{t('tagline')}</div>
-        </div>
-      </header>
+    <>
+      <div className="container app-shell py-4">
+        <header className="hero text-center">
+          <h1 className="hero-title">Krishva</h1>
+          <div className="hero-rule" aria-hidden="true"><span /></div>
+          <p className="hero-meaning">{t('tagline')}</p>
+        </header>
 
-      <div className="setting-card p-3 my-3">
-        <div className="row g-3">
-          <div className="col-sm-6">
-            <SegmentedToggle
-              name="lang"
-              label={t('language')}
-              value={lang}
-              onChange={handleLanguage}
-              options={[
-                { value: 'en', label: 'English' },
-                { value: 'hi', label: 'हिन्दी' },
-              ]}
-            />
-          </div>
-          <div className="col-sm-6">
-            <SegmentedToggle
-              name="voice"
-              label={t('voice')}
-              value={voice}
-              onChange={handleVoice}
-              options={[
-                { value: 'off', label: t('voice_off') },
-                { value: 'on', label: t('voice_on') },
-              ]}
-            />
-          </div>
-        </div>
-        {voice === 'on' && (
-          <div className="row g-2 mt-1">
-            <div className="col-12">
-              <VoicePicker onTest={testVoice} testing={testing} t={t} />
+        <div className="glass setting-card p-3 mb-3">
+          <div className="row g-3">
+            <div className="col-sm-6">
+              <SegmentedToggle
+                name="lang"
+                label={t('language')}
+                value={lang}
+                onChange={handleLanguage}
+                options={[
+                  { value: 'en', label: 'English' },
+                  { value: 'hi', label: 'हिन्दी' },
+                ]}
+              />
+            </div>
+            <div className="col-sm-6">
+              <SegmentedToggle
+                name="voice"
+                label={t('voice')}
+                value={voice}
+                onChange={handleVoice}
+                options={[
+                  { value: 'off', label: t('voice_off') },
+                  { value: 'on', label: t('voice_on') },
+                ]}
+              />
             </div>
           </div>
-        )}
-        {(voiceHint || note) && <div className="small text-muted mt-2">{note || voiceHint}</div>}
-      </div>
-
-      <p className="text-muted">{t('intro')}</p>
-
-      <form onSubmit={onSubmit}>
-        <input
-          ref={inputRef}
-          type="file"
-          className="form-control mb-2"
-          accept="image/*"
-          onChange={onPick}
-          aria-label={t('disease')}
-        />
-        {preview && <img src={preview} className="preview rounded border" alt="preview" />}
-        <button type="submit" className="btn btn-success w-100 fw-bold mb-3" disabled={busy}>
-          {busy ? t('analyzing') : t('analyze')}
-        </button>
-      </form>
-
-      {error && (
-        <div className={`alert ${apiUp === false ? 'alert-danger' : 'alert-warning'}`}>
-          {error}
-          {apiUp === false && (
-            <div className="small mt-1">
-              {API_URL} &middot; {isLocalDev() ? t('api_down_local') : t('api_down_hosted')}
+          {voice === 'on' && (
+            <div className="row g-2 mt-1">
+              <div className="col-12">
+                <VoicePicker onTest={testVoice} testing={testing} t={t} />
+              </div>
             </div>
           )}
+          {(voiceHint || note) && <div className="small muted mt-2">{note || voiceHint}</div>}
         </div>
-      )}
 
-      {results && (
-        <ResultTable
-          results={results}
-          t={t}
-          lang={lang}
-          speaking={speaking}
-          onReplay={speakTop}
-          onNewScan={reset}
-        />
-      )}
+        <form className="glass upload-card p-3 p-sm-4 mb-3" onSubmit={onSubmit}>
+          <p className="muted mb-3">{t('intro')}</p>
+          <input
+            ref={inputRef}
+            type="file"
+            className="form-control mb-3"
+            accept="image/*"
+            onChange={onPick}
+            aria-label={t('disease')}
+          />
+          {preview && <img src={preview} className="preview" alt="preview" />}
+          <button type="submit" className="btn btn-primary-solid w-100" disabled={busy}>
+            {busy ? t('analyzing') : t('analyze')}
+          </button>
+        </form>
 
-      <hr className="my-4" />
-      <p className="text-muted small mb-0">{t('footer')}</p>
-    </div>
+        {error && (
+          <div className={`glass alert ${apiUp === false ? 'alert-danger' : 'alert-warning'}`}>
+            {error}
+            {apiUp === false && (
+              <div className="small mt-1">
+                {API_URL} &middot; {isLocalDev() ? t('api_down_local') : t('api_down_hosted')}
+              </div>
+            )}
+          </div>
+        )}
+
+        {results && (
+          <ResultTable
+            results={results}
+            t={t}
+            lang={lang}
+            speaking={speaking}
+            onReplay={speakTop}
+            onNewScan={reset}
+          />
+        )}
+
+        <p className="muted small text-center mt-4 mb-0">{t('footer')}</p>
+      </div>
+    </>
   );
 }

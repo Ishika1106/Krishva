@@ -1,4 +1,3 @@
-// Fallback copy so the UI renders before the API answers, and if it is down; translator() prefers the backend's copy.
 export const FALLBACK_UI = {
   en: {
     tagline: 'Krish (farming) + Nova (new) = New Farming',
